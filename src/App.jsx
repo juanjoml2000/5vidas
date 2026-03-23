@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase';
 import Card from './components/Card';
 import Auth from './components/Auth';
-import { Heart, Trophy, Users, Play, Plus, LogOut, Menu, X, Zap, User, Save, Info, Bot, Share2, UserX } from 'lucide-react';
+import { Heart, Trophy, Users, Play, Plus, LogOut, Menu, X, Zap, User, Save, Info, Bot, Share2, UserX, MessageSquare, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function App() {
@@ -12,6 +12,10 @@ export default function App() {
   const [game, setGame] = useState(null);
   const [players, setPlayers] = useState([]);
   const [hasJoined, setHasJoined] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const messagesEndRef = React.useRef(null);
   const me = (players || []).find(p => p.user_id === session?.user?.id);
   const isHost = session?.user?.id === game?.host_id;
   const [myCards, setMyCards] = useState([]);
@@ -104,6 +108,9 @@ export default function App() {
       }
     }
     setTrickCards(table || []);
+
+    const { data: mData } = await supabase.from('messages').select('*').eq('game_id', gameId).order('created_at', { ascending: true });
+    setMessages(mData || []);
   }, []);
 
   useEffect(() => {
@@ -117,6 +124,7 @@ export default function App() {
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cards', filter: `game_id=eq.${game.id}` }, () => fetchGameState(game.id, session.user.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `game_id=eq.${game.id}` }, () => fetchGameState(game.id, session.user.id))
       .subscribe();
     fetchGameState(game.id, session.user.id);
     return () => { supabase.removeChannel(channel); };
@@ -167,6 +175,12 @@ export default function App() {
       setView('lobby');
     }
   }, [me, game, hasJoined, isHost]);
+
+  useEffect(() => {
+    if (isChatOpen) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isChatOpen]);
 
   useEffect(() => {
     if (session && roomToJoin) {
@@ -252,6 +266,18 @@ export default function App() {
 
   const addBot = async () => fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add-bot', game_id: game.id }) });
   
+  const sendMessage = async () => {
+    if (!chatInput.trim() || !game || !me) return;
+    const { error } = await supabase.from('messages').insert({
+      game_id: game.id,
+      player_id: me.id,
+      name: me.name,
+      content: chatInput.trim()
+    });
+    if (error) alert(error.message);
+    else setChatInput('');
+  };
+
   const copyInvite = () => {
     const url = 'https://5vidas.vercel.app';
     navigator.clipboard.writeText(url);
@@ -293,6 +319,13 @@ export default function App() {
           {!game && <button onClick={() => setShowRules(true)} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-red-500"><Info className="w-6 h-6" /></button>}
           {game && (
             <>
+              <button 
+                onClick={() => setIsChatOpen(!isChatOpen)} 
+                className={`p-2 hover:bg-white/10 rounded-xl transition-colors relative ${messages.length > 0 ? 'text-red-500' : 'text-slate-400'}`}
+              >
+                <MessageSquare className="w-6 h-6" />
+                {messages.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-black" />}
+              </button>
               <button onClick={copyInvite} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-emerald-500"><Share2 className="w-6 h-6" /></button>
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">{isMenuOpen ? <X /> : <Menu />}</button>
             </>
@@ -338,6 +371,51 @@ export default function App() {
                 )}
                 <button onClick={() => { setIsMenuOpen(false); setShowRules(true); }} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Info className="w-5 h-5 text-red-500" /> REGLAS DEL JUEGO</button>
                 <button onClick={() => { setIsMenuOpen(false); leaveGame(); }} className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-black py-4 rounded-2xl border border-red-500/20 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Zap className="w-5 h-5 fill-current" /> SALIR DE LA MESA (LEAVE)</button>
+             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isChatOpen && (
+          <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="fixed inset-y-0 left-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[60] border-r border-white/10 flex flex-col shadow-2xl shadow-black">
+             <div className="p-6 border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                   <MessageSquare className="w-5 h-5 text-red-500" />
+                   <h2 className="text-xl font-black italic uppercase tracking-tighter">Chat</h2>
+                </div>
+                <button onClick={() => setIsChatOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button>
+             </div>
+             
+             <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                {messages.length === 0 && <p className="text-center text-slate-500 text-xs italic py-10">Sé el primero en decir algo...</p>}
+                {messages.map((m, idx) => {
+                   const isMe = m.player_id === me?.id;
+                   return (
+                      <div key={idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                         <div className={`max-w-[85%] p-3 rounded-2xl ${isMe ? 'bg-red-600 text-white rounded-br-none' : 'bg-white/10 text-slate-200 rounded-bl-none border border-white/5'}`}>
+                            {!isMe && <p className="text-[10px] font-black uppercase text-red-400 mb-1">{m.name}</p>}
+                            <p className="text-sm font-medium leading-relaxed break-words">{m.content}</p>
+                         </div>
+                         <p className="text-[8px] uppercase text-slate-500 mt-1 px-1">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                      </div>
+                   );
+                })}
+                <div ref={messagesEndRef} />
+             </div>
+             
+             <div className="p-6 bg-black/20 border-t border-white/10">
+                <form onSubmit={(e) => { e.preventDefault(); sendMessage(); }} className="flex items-center gap-2">
+                   <input 
+                      autoFocus
+                      type="text" 
+                      value={chatInput} 
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="Escribe algo..." 
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-500 transition-colors"
+                   />
+                   <button type="submit" className="p-3 bg-red-600 hover:bg-red-500 text-white rounded-xl transition-all active:scale-95 shadow-lg shadow-red-900/20"><Send className="w-5 h-5" /></button>
+                </form>
              </div>
           </motion.div>
         )}
