@@ -82,10 +82,15 @@ export default function Auth() {
   };
 
   const handleAnonymous = async () => {
+    const guestName = window.prompt('Introduce tu Nickname para jugar:', 'Invitado_' + Math.floor(Math.random() * 1000));
+    if (!guestName) return;
+
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.signInAnonymously();
+      const { error } = await supabase.auth.signInAnonymously({
+        options: { data: { display_name: guestName } }
+      });
       if (error) throw error;
     } catch (err) {
       setError(err.message.includes('not enabled') ? 'El administrador debe activar el "Inicio de sesión anónimo" en Supabase.' : err.message);

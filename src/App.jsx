@@ -51,7 +51,9 @@ export default function App() {
      
      if (!prof && !error) {
         // Create default profile
-        const defaultName = email.split('@')[0];
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const metaName = authUser?.user_metadata?.display_name;
+        const defaultName = metaName || (email ? email.split('@')[0] : 'Invitado');
         const { data: newProf } = await supabase.from('profiles').insert({ id: userId, display_name: defaultName }).select().single();
         prof = newProf;
      }
@@ -310,12 +312,22 @@ export default function App() {
               </div>
 
               {/* Create Room Card */}
-              <button onClick={createGame} disabled={loading} className="relative bg-white/5 border border-white/10 p-8 rounded-[3rem] transition-all hover:bg-white/10 active:scale-95 overflow-hidden group">
-                 <div className="relative z-10 flex flex-col items-start gap-4">
-                    <div className="p-4 bg-red-600 rounded-3xl group-hover:scale-110 transition-transform"><Plus className="w-8 h-8 font-black" /></div>
-                    <div className="text-left font-black uppercase text-3xl">Crear Sala</div>
-                 </div>
-              </button>
+              {!session?.user?.is_anonymous ? (
+                <button onClick={createGame} disabled={loading} className="relative bg-white/5 border border-white/10 p-8 rounded-[3rem] transition-all hover:bg-white/10 active:scale-95 overflow-hidden group">
+                   <div className="relative z-10 flex flex-col items-start gap-4">
+                      <div className="p-4 bg-red-600 rounded-3xl group-hover:scale-110 transition-transform"><Plus className="w-8 h-8 font-black" /></div>
+                      <div className="text-left font-black uppercase text-3xl">Crear Sala</div>
+                   </div>
+                </button>
+              ) : (
+                <div className="relative bg-white/5 border border-white/5 p-8 rounded-[3rem] flex flex-col items-center justify-center gap-4 text-center border-dashed opacity-70">
+                   <div className="p-4 bg-white/5 rounded-3xl"><Plus className="w-8 h-8 text-slate-500" /></div>
+                   <div className="space-y-1">
+                      <p className="font-black uppercase text-xl text-slate-400 leading-none">Acceso Invitado</p>
+                      <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest">Solo Unirse</p>
+                   </div>
+                </div>
+              )}
               
               {/* Rooms List Card */}
               <div className="bg-white/5 border border-white/10 p-8 rounded-[3rem] flex flex-col gap-6 lg:row-span-1">
