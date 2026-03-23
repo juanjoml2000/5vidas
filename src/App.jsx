@@ -42,7 +42,6 @@ export default function App() {
         })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cards', filter: `game_id=eq.${game.id}` }, 
         async () => {
-          // Re-fetch my cards when any card in the game changes
           const myPlayer = players.find(p => p.user_id === session.user.id);
           if (myPlayer) {
             const { data } = await supabase.from('cards').select('*').eq('player_id', myPlayer.id).eq('is_played', false);
@@ -59,7 +58,7 @@ export default function App() {
     return () => {
       supabase.removeChannel(gameChannel);
     };
-  }, [game?.id, session, players.length]); // Re-subscribe if players change to ensure 'me' is updated
+  }, [game?.id, session, players.length]);
 
   // Handle Game Logic Transitions
   useEffect(() => {
@@ -85,7 +84,6 @@ export default function App() {
   const joinGame = async (gameId) => {
     setLoading(true);
     try {
-      // Create or get player using user_id to identify participation
       const { data: existingPlayer } = await supabase.from('players')
         .select('*')
         .eq('game_id', gameId)
@@ -114,6 +112,13 @@ export default function App() {
     }
   };
 
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  if (!session) return <Auth />;
+
+  // These must be after the session check
   const me = players.find(p => p.user_id === session.user.id);
   const isHost = players[0]?.user_id === session.user.id;
   const isMyTurn = game?.current_turn_id === me?.id;
@@ -156,21 +161,13 @@ export default function App() {
     }
   };
 
-  const logout = async () => {
-    await supabase.auth.signOut();
-  };
-
-  if (!session) return <Auth />;
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-red-500/30 overflow-x-hidden">
-      {/* Background Decor */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-600/30 blur-[120px] rounded-full" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-600/30 blur-[120px] rounded-full" />
       </div>
 
-      {/* Navigation */}
       <nav className="relative z-50 flex items-center justify-between px-6 py-4 bg-black/40 backdrop-blur-xl border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-red-900/40">
@@ -199,7 +196,6 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Side Menu */}
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div
@@ -283,7 +279,6 @@ export default function App() {
                   <Users className="w-6 h-6 text-red-500" />
                 </div>
                 <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                  {/* Simplified salas list or automatic join could be here */}
                   <p className="text-slate-500 text-center py-8 bg-black/20 rounded-3xl border border-dashed border-white/10">No hay salas disponibles</p>
                 </div>
               </div>
@@ -293,7 +288,6 @@ export default function App() {
 
         {game && (
           <div className="flex flex-col gap-6 pt-4">
-            {/* Header: Game Info */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/5 backdrop-blur-md border border-white/10 p-4 md:p-6 rounded-3xl shadow-xl">
               <div className="flex items-center gap-4">
                 <div className="px-4 py-2 bg-red-600 rounded-2xl font-black shadow-lg shadow-red-950/40">
@@ -330,9 +324,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Main Play Area */}
             <div className="relative min-h-[40vh] md:min-h-[50vh] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 to-black/80 rounded-[3rem] border border-white/5 flex items-center justify-center p-8 overflow-hidden">
-               {/* Table center */}
                <div className="flex flex-wrap justify-center gap-4 relative z-10">
                 <AnimatePresence>
                   {tricks.map(t => (
@@ -355,7 +347,6 @@ export default function App() {
                 )}
                </div>
 
-               {/* Turn Alert */}
                {isMyTurn && (
                  <motion.div 
                    animate={{ scale: [1, 1.05, 1] }} 
@@ -367,7 +358,6 @@ export default function App() {
                )}
             </div>
 
-            {/* Interaction Area (Cards or Bidding) */}
             <div className="mt-4 pb-12">
               {view === 'bidding' && (
                 <motion.div 
@@ -434,7 +424,7 @@ export default function App() {
               <p className="text-slate-400 font-bold uppercase tracking-widest">¡Partida Finalizada!</p>
             </div>
             
-            <div className="grid grid-cols-1 gap-4 w-full max-w-md">
+            <div className="grid grid-cols-1 gap-4 w-full max-md">
                {players.sort((a,b) => b.lives - a.lives).map((p, i) => (
                  <div key={p.id} className={`flex items-center justify-between p-6 rounded-3xl border ${i === 0 ? 'bg-amber-600/20 border-amber-500/50' : 'bg-white/5 border-white/10'}`}>
                     <div className="flex items-center gap-4">
