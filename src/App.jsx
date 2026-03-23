@@ -167,9 +167,20 @@ export default function App() {
         name: name || 'Nueva Mesa',
         host_id: session.user.id
       }).select().single();
-      if (error) throw error;
-      joinGame(data.id);
-    } catch (err) { alert(err.message); } finally { setLoading(false); }
+      
+      if (error) {
+        if (error.message.includes("column 'host_id'") || error.message.includes("column 'name'")) {
+          alert("🛠️ ERROR DE BASE DE DATOS: Parece que no has aplicado los últimos cambios en Supabase (falta la columna 'host_id' o 'name'). Copia el código SQL que te he pasado y pégalo en el Editor de SQL de tu panel de Supabase.");
+        } else {
+          throw error;
+        }
+      } else {
+        joinGame(data.id);
+      }
+    } catch (err) { 
+      console.error("Create Game Error:", err);
+      alert("Error al crear: " + err.message); 
+    } finally { setLoading(false); }
   };
 
   const joinGame = async (gameId) => {
