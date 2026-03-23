@@ -278,14 +278,20 @@ export default function App() {
   
   const sendMessage = async () => {
     if (!chatInput.trim() || !session?.user) return;
+    const gId = game?.id || '00000000-0000-0000-0000-000000000000';
     const { error } = await supabase.from('messages').insert({
-      game_id: game?.id || '00000000-0000-0000-0000-000000000000',
+      game_id: gId,
       player_id: me?.id || null,
       name: profile?.nickname || session.user.user_metadata?.display_name || 'Anónimo',
       content: chatInput.trim()
     });
-    if (error) alert("Error al enviar: " + error.message);
-    else setChatInput('');
+    if (error) {
+      console.error("Error sending message:", error);
+      alert("Error al enviar: " + error.message);
+    } else {
+      setChatInput('');
+      fetchGameState(game?.id || null, session.user.id);
+    }
   };
 
   const copyInvite = () => {
