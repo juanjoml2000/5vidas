@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase';
 import Card from './components/Card';
 import Auth from './components/Auth';
-import { Heart, Trophy, Users, Play, Plus, LogOut, Menu, X, Zap, User, Save } from 'lucide-react';
+import { Heart, Trophy, Users, Play, Plus, LogOut, Menu, X, Zap, User, Save, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function App() {
@@ -17,6 +17,7 @@ export default function App() {
   const [view, setView] = useState('lobby');
   const [loading, setLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   useEffect(() => {
     // Check for recovery hash directly on mount in case event fires too soon
@@ -215,6 +216,7 @@ export default function App() {
           <span className="text-xl font-black tracking-tighter uppercase">5 VIDAS</span>
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setShowRules(true)} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-red-500"><Info className="w-6 h-6" /></button>
           {game && <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">{isMenuOpen ? <X /> : <Menu />}</button>}
           <div className="h-8 w-px bg-white/10 mx-2" />
           <button onClick={logout} className="flex items-center gap-2 px-4 py-2 text-red-400 font-bold rounded-xl active:scale-95 transition-all"><LogOut className="w-5 h-5" /><span className="hidden sm:inline uppercase">Salir</span></button>
@@ -401,6 +403,63 @@ export default function App() {
           </div>
         )}
       </main>
+
+      <AnimatePresence>
+        {showRules && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-slate-900 border border-white/10 rounded-[3rem] p-8 max-w-2xl w-full shadow-2xl relative"
+            >
+               <button onClick={() => setShowRules(false)} className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
+               
+               <div className="flex items-center gap-4 mb-8">
+                  <div className="bg-red-600 p-4 rounded-3xl shrink-0"><Info className="w-8 h-8 text-white" /></div>
+                  <div>
+                     <h2 className="text-3xl font-black italic uppercase tracking-tighter">Cómo Jugar</h2>
+                     <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-1">Reglas Oficiales de 5 Vidas</p>
+                  </div>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 text-sm">
+                  <div className="space-y-4">
+                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                        <h3 className="text-red-400 font-black uppercase text-xs mb-2">1. Las Rondas</h3>
+                        <p className="text-slate-300">Empezamos con **5 cartas**. Cada ronda el número de cartas baja: 4, 3, 2 hasta llegar a **1**.</p>
+                     </div>
+                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                        <h3 className="text-red-400 font-black uppercase text-xs mb-2">2. La Apuesta</h3>
+                        <p className="text-slate-300">Al ver tus cartas, debes decir cuántas **bazas** (veces que ganarás la carta del centro) te llevarás.</p>
+                     </div>
+                  </div>
+                  <div className="space-y-4">
+                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                        <h3 className="text-red-400 font-black uppercase text-xs mb-2">3. El Último Postor</h3>
+                        <p className="text-slate-300 italic">"Regla de Oro": El último en apostar NO puede decir un número que haga que la suma de apuestas cuadre con las cartas.</p>
+                     </div>
+                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                        <h3 className="text-red-400 font-black uppercase text-xs mb-2">4. Puntuación</h3>
+                        <p className="text-slate-300 text-xs">Pierdes vidas según la diferencia: Si pides 2 y te llevas 0, pierdes **2 vidas**. Si aciertas exactamente, ¡no pierdes nada!</p>
+                     </div>
+                  </div>
+               </div>
+
+               <button 
+                  onClick={() => setShowRules(false)}
+                  className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase hover:scale-[1.02] transition-all"
+               >
+                  ¡Entendido, a jugar!
+               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
