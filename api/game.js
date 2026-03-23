@@ -37,10 +37,16 @@ export default async function handler(req, res) {
          const { data: others } = await supabase.from('cards').select('*, player:players(name)').eq('game_id', game_id).neq('player_id', player_id)
          return res.status(200).json({ cards: others })
       case 'cleanup':
-         const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-         // 1. Delete dead players
-         await supabase.from('players').delete().lt('last_ping', fiveMinsAgo);
-         // 2. Identify games with 0 players
+         const tenMinsAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+         
+         // 1. Delete dead players (>10 mins)
+         await supabase.from('players').delete().lt('last_ping', tenMinsAgo);
+         
+         // 2. Delete old games (>24 hours) cascade-style (assuming RLS/Foreign Keys handles it if not, manually)
+         await supabase.from('games').delete().lt('created_at', oneDayAgo);
+
+         // 3. Delete empty waiting games
          const { data: allWaiting } = await supabase.from('games').select('id, players(id)').eq('status', 'waiting');
          const toDelete = (allWaiting || []).filter(g => !g.players || g.players.length === 0).map(g => g.id);
          if (toDelete.length > 0) {

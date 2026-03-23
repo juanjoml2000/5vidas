@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { LogIn, UserPlus, Mail, Lock, Loader2, Save } from 'lucide-react';
+import { LogIn, UserPlus, Mail, Lock, Loader2, Save, UserCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Auth() {
@@ -79,6 +79,19 @@ export default function Auth() {
         setTimeout(() => setIsUpdatePassword(false), 2000);
     }
     setLoading(false);
+  };
+
+  const handleAnonymous = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { error } = await supabase.auth.signInAnonymously();
+      if (error) throw error;
+    } catch (err) {
+      setError(err.message.includes('not enabled') ? 'El administrador debe activar el "Inicio de sesión anónimo" en Supabase.' : err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -186,6 +199,18 @@ export default function Auth() {
               </>
             )}
           </button>
+
+          {!isUpdatePassword && (
+            <button
+              type="button"
+              onClick={handleAnonymous}
+              disabled={loading}
+              className="w-full bg-white/5 hover:bg-white/10 text-white font-bold py-4 rounded-2xl border border-white/10 transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-lg"
+            >
+              <UserCircle className="w-5 h-5 opacity-70" />
+              Jugar como Invitado
+            </button>
+          )}
         </form>
 
         {!isUpdatePassword && (
