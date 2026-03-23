@@ -11,6 +11,7 @@ export default function App() {
   const [newNick, setNewNick] = useState('');
   const [game, setGame] = useState(null);
   const [players, setPlayers] = useState([]);
+  const [hasJoined, setHasJoined] = useState(false);
   const me = (players || []).find(p => p.user_id === session?.user?.id);
   const isHost = session?.user?.id === game?.host_id;
   const [myCards, setMyCards] = useState([]);
@@ -109,7 +110,12 @@ export default function App() {
     if (!session?.user?.id || !game?.id) return;
     const channel = supabase.channel(`game_sync:${game.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${game.id}` }, () => fetchGameState(game.id, session.user.id))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${game.id}` }, () => fetchGameState(game.id, session.user.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, (payload) => {
+        // Refresh on any change if it's our game OR any DELETE (to be safe)
+        if (payload.eventType === 'DELETE' || (payload.new && payload.new.game_id === game.id)) {
+          fetchGameState(game.id, session.user.id);
+        }
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cards', filter: `game_id=eq.${game.id}` }, () => fetchGameState(game.id, session.user.id))
       .subscribe();
     fetchGameState(game.id, session.user.id);
@@ -117,7 +123,6 @@ export default function App() {
   }, [game?.id, session?.user?.id, fetchGameState]);
 
   useEffect(() => {
-    const me = players.find(p => p.user_id === session?.user?.id);
     if (!game || !me) return;
     const ping = () => supabase.from('players').update({ last_ping: new Date() }).eq('id', me.id);
     const interval = setInterval(ping, 20000);
@@ -152,13 +157,16 @@ export default function App() {
   }, [session?.user?.id]);
 
   useEffect(() => {
-    // KICK DETECTION: If I am in a game but I am not in the players list anymore...
-    if (game && players.length > 0 && !me && session?.user && !isHost) {
+    // KICK DETECTION: Si estoy en una partida pero ya no aparezco en la lista de jugadores...
+    if (me) {
+      if (!hasJoined) setHasJoined(true);
+    } else if (game && hasJoined && !isHost) {
       alert('⚠️ Has sido expulsado de la mesa por el anfitrión.');
       setGame(null);
+      setHasJoined(false);
       setView('lobby');
     }
-  }, [players.length, me, game, session?.user, isHost]);
+  }, [me, game, hasJoined, isHost]);
 
   useEffect(() => {
     if (session && roomToJoin) {
