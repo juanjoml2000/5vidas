@@ -205,19 +205,9 @@ export default function App() {
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed inset-y-0 right-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[60] border-l border-white/10 p-8 shadow-2xl shadow-black">
-             <div className="flex items-center justify-between mb-12"><h2 className="text-2xl font-black italic">MENU</h2><button onClick={() => setIsMenuOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button></div>
+             <div className="flex items-center justify-between mb-12"><h2 className="text-2xl font-black italic uppercase tracking-tighter">OPCIONES</h2><button onClick={() => setIsMenuOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button></div>
              <div className="space-y-6">
-                <div className="p-6 bg-white/5 rounded-3xl border border-white/10">
-                   <p className="text-[10px] font-black text-red-500 uppercase tracking-tighter mb-4">Jugador</p>
-                   <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center font-black text-2xl uppercase shadow-lg shadow-red-900/40">{me?.name?.[0]}</div>
-                      <div>
-                        <p className="font-bold text-lg">{me?.name}</p>
-                        <div className="flex gap-1 text-red-500">{[...Array(me?.lives || 0)].map((_, i) => <Heart key={i} className="w-4 h-4 fill-current" />)}</div>
-                      </div>
-                   </div>
-                </div>
-                <button onClick={() => { setIsMenuOpen(false); leaveGame(); }} className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-bold py-5 rounded-3xl border border-red-500/20 transition-all flex items-center justify-center gap-3"><Zap className="w-5 h-5 fill-current" /> ABANDONAR</button>
+                <button onClick={() => { setIsMenuOpen(false); leaveGame(); }} className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-black py-6 rounded-3xl border border-red-500/20 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Zap className="w-5 h-5 fill-current" /> SALIR DE LA MESA</button>
              </div>
           </motion.div>
         )}
@@ -235,7 +225,7 @@ export default function App() {
               {/* Profile Card */}
               <div className="relative bg-white/5 border border-white/10 p-8 rounded-[3rem] overflow-hidden group">
                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><User className="w-24 h-24" /></div>
-                   <h2 className="text-xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2">Tu Perfil <span className="text-[10px] text-slate-500 italic lowercase">v2.5</span></h2>
+                   <h2 className="text-xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2">Tu Perfil <span className="text-[10px] text-slate-500 italic lowercase">v2.6</span></h2>
                    <div className="space-y-4 relative z-10">
                       <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nickname Público</label>
