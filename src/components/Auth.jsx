@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { LogIn, UserPlus, Mail, Lock, Loader2 } from 'lucide-react';
+import { LogIn, UserPlus, Mail, Lock, Loader2, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Auth() {
@@ -13,6 +13,11 @@ export default function Auth() {
   const [isUpdatePassword, setIsUpdatePassword] = useState(false);
 
   React.useEffect(() => {
+    // Also check hash directly on mount for robustness
+    if (window.location.hash.includes('type=recovery')) {
+      setIsUpdatePassword(true);
+    }
+    
     supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setIsUpdatePassword(true);
     });
