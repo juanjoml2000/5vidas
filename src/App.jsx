@@ -29,7 +29,7 @@ export default function App() {
 
   // Fetch and Subscribe to Game Data
   useEffect(() => {
-    if (!session || !game?.id) return;
+    if (!session?.user || !game?.id) return;
 
     const gameChannel = supabase
       .channel(`game:${game.id}`)
@@ -37,7 +37,7 @@ export default function App() {
         (payload) => setGame(payload.new))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${game.id}` }, 
         async () => {
-          const { data } = await supabase.from('players').select('*').eq('game_id', game.id).order('joined_at');
+          const { data } = await supabase.from('players').select('*').eq('game_id', game.id).order('id');
           setPlayers(data || []);
         })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cards', filter: `game_id=eq.${game.id}` }, 
@@ -50,7 +50,7 @@ export default function App() {
         })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tricks', filter: `game_id=eq.${game.id}` }, 
         async () => {
-          const { data } = await supabase.from('tricks').select('*, card:cards(*)').eq('game_id', game.id).eq('round_number', game.current_round).order('played_at');
+          const { data } = await supabase.from('tricks').select('*, card:cards(*)').eq('game_id', game.id).eq('round_number', game.current_round).order('created_at');
           setTricks(data || []);
         })
       .subscribe();
@@ -58,7 +58,7 @@ export default function App() {
     return () => {
       supabase.removeChannel(gameChannel);
     };
-  }, [game?.id, session, players.length]);
+  }, [game?.id, session?.user?.id, players.length]);
 
   // Handle Game Logic Transitions
   useEffect(() => {
@@ -69,6 +69,7 @@ export default function App() {
   }, [game?.status]);
 
   const createGame = async () => {
+    if (!session?.user) return;
     setLoading(true);
     try {
       const { data, error } = await supabase.from('games').insert({ status: 'waiting' }).select().single();
@@ -82,6 +83,7 @@ export default function App() {
   };
 
   const joinGame = async (gameId) => {
+    if (!session?.user) return;
     setLoading(true);
     try {
       const { data: existingPlayer } = await supabase.from('players')
@@ -103,7 +105,7 @@ export default function App() {
       const { data: gData } = await supabase.from('games').select('*').eq('id', gameId).single();
       setGame(gData);
       
-      const { data: pData } = await supabase.from('players').select('*').eq('game_id', gameId).order('joined_at');
+      const { data: pData } = await supabase.from('players').select('*').eq('game_id', gameId).order('id');
       setPlayers(pData || []);
     } catch (err) {
       alert('Error al unirse: ' + err.message);
@@ -116,15 +118,15 @@ export default function App() {
     await supabase.auth.signOut();
   };
 
-  if (!session) return <Auth />;
+  if (!session?.user) return <Auth />;
 
-  // These must be after the session check
-  const me = players.find(p => p.user_id === session.user.id);
-  const isHost = players[0]?.user_id === session.user.id;
+  const me = (players || []).find(p => p.user_id === session.user.id);
+  const isHost = players && players[0] && players[0].user_id === session.user.id;
   const isMyTurn = game?.current_turn_id === me?.id;
-  const everyoneBid = players.every(p => p.current_bid !== null);
+  const everyoneBid = players && players.length > 0 && players.every(p => p.current_bid !== null);
 
   const startGame = async () => {
+    if (!game?.id) return;
     await fetch('/api/game', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -133,7 +135,7 @@ export default function App() {
   };
 
   const placeBid = async (bid) => {
-    if (!me) return;
+    if (!me || !game?.id) return;
     await fetch('/api/game', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -142,7 +144,7 @@ export default function App() {
   };
 
   const playCard = async (cardId) => {
-    if (!me) return;
+    if (!me || !game?.id) return;
     await fetch('/api/game', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -295,12 +297,12 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-2xl border border-white/10 font-bold text-slate-300">
                   <Trophy className="w-5 h-5 text-amber-500" />
-                  {tricks.length} Bazas Tiradas
+                  {tricks?.length || 0} Bazas Tiradas
                 </div>
               </div>
               
               <div className="flex items-center gap-3">
-                {players.map(p => (
+                {(players || []).map(p => (
                   <motion.div 
                     key={p.id}
                     animate={{ scale: game.current_turn_id === p.id ? 1.1 : 1 }}
@@ -308,10 +310,10 @@ export default function App() {
                   >
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-[10px] uppercase font-black tracking-widest opacity-60">
-                        {p.user_id === session.user.id ? 'TÚ' : p.name.substring(0, 8)}
+                        {p.user_id === session?.user?.id ? 'TÚ' : p.name.substring(0, 8)}
                       </span>
                       <div className="flex items-center gap-0.5">
-                        {[...Array(p.lives)].map((_, i) => <Heart key={i} className={`w-3 h-3 ${game.current_turn_id === p.id ? 'fill-white' : 'fill-red-500'}`} />)}
+                        {[...Array(p.lives || 0)].map((_, i) => <Heart key={i} className={`w-3 h-3 ${game.current_turn_id === p.id ? 'fill-white' : 'fill-red-500'}`} />)}
                       </div>
                       {p.current_bid !== null && (
                         <span className="text-xs font-bold mt-1 bg-black/20 px-2 py-0.5 rounded-full">
@@ -327,7 +329,7 @@ export default function App() {
             <div className="relative min-h-[40vh] md:min-h-[50vh] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 to-black/80 rounded-[3rem] border border-white/5 flex items-center justify-center p-8 overflow-hidden">
                <div className="flex flex-wrap justify-center gap-4 relative z-10">
                 <AnimatePresence>
-                  {tricks.map(t => (
+                  {(tricks || []).map(t => (
                     <motion.div 
                       key={t.id}
                       initial={{ scale: 0, rotate: -45, y: 50 }}
@@ -336,13 +338,13 @@ export default function App() {
                     >
                       <Card card={t.card} disabled />
                       <div className="absolute -top-3 -right-3 px-2 py-1 bg-red-600 rounded-lg text-[10px] font-black uppercase shadow-lg">
-                        {players.find(p => p.id === t.player_id)?.name.split('@')[0]}
+                        {(players || []).find(p => p.id === t.player_id)?.name.split('@')[0]}
                       </div>
                     </motion.div>
                   ))}
                 </AnimatePresence>
                 
-                {tricks.length === 0 && game.status === 'playing' && (
+                {(tricks || []).length === 0 && game.status === 'playing' && (
                   <div className="text-slate-700 font-black text-4xl md:text-6xl tracking-tighter opacity-10 select-none">TABLERO</div>
                 )}
                </div>
@@ -367,7 +369,7 @@ export default function App() {
                 >
                   <h3 className="text-center text-3xl font-black tracking-tight mb-8">¿CUÁNTAS BAZAS GANARÁS?</h3>
                   <div className="flex flex-wrap justify-center gap-3 md:gap-4">
-                    {[...Array(game.current_round + 1)].map((_, i) => (
+                    {[...Array((game.current_round || 0) + 1)].map((_, i) => (
                       <button
                         key={i}
                         onClick={() => placeBid(i)}
@@ -390,7 +392,7 @@ export default function App() {
 
               {view === 'playing' && (
                 <div className="flex flex-wrap justify-center gap-2 md:gap-4 px-4 overflow-x-auto pb-4 pt-8 md:pt-12">
-                   {myCards.map(c => (
+                   {(myCards || []).map(c => (
                      <Card 
                        key={c.id} 
                        card={c} 
@@ -402,7 +404,7 @@ export default function App() {
                 </div>
               )}
 
-              {view === 'lobby' && players.length >= 2 && isHost && (
+              {view === 'lobby' && players?.length >= 2 && isHost && (
                 <div className="flex justify-center pt-8">
                   <button
                     onClick={startGame}
@@ -424,15 +426,15 @@ export default function App() {
               <p className="text-slate-400 font-bold uppercase tracking-widest">¡Partida Finalizada!</p>
             </div>
             
-            <div className="grid grid-cols-1 gap-4 w-full max-md">
-               {players.sort((a,b) => b.lives - a.lives).map((p, i) => (
+            <div className="grid grid-cols-1 gap-4 w-full max-w-md">
+               {(players || []).sort((a,b) => (b.lives || 0) - (a.lives || 0)).map((p, i) => (
                  <div key={p.id} className={`flex items-center justify-between p-6 rounded-3xl border ${i === 0 ? 'bg-amber-600/20 border-amber-500/50' : 'bg-white/5 border-white/10'}`}>
                     <div className="flex items-center gap-4">
                        <span className={`text-2xl font-black ${i === 0 ? 'text-amber-500' : 'text-slate-500'}`}>#{i+1}</span>
                        <span className="font-bold text-xl uppercase tracking-tight">{p.name}</span>
                     </div>
                     <div className="flex items-center gap-1 text-red-500">
-                      {[...Array(p.lives)].map((_, i) => <Heart key={i} className="w-5 h-5 fill-current" />)}
+                      {[...Array(p.lives || 0)].map((_, i) => <Heart key={i} className="w-5 h-5 fill-current" />)}
                     </div>
                  </div>
                ))}
