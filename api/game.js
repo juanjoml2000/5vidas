@@ -39,9 +39,18 @@ export default async function handler(req, res) {
   }
 }
 
+async function getSortedPlayers(supabase, game_id) {
+  const { data: players } = await supabase.from('players')
+    .select('*')
+    .eq('game_id', game_id)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true }); // Fallback sorting
+  return players || [];
+}
+
 async function startRound(supabase, game_id) {
   const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
-  const { data: players } = await supabase.from('players').select('*').eq('game_id', game_id).order('id')
+  const players = await getSortedPlayers(supabase, game_id)
 
   if (!game || players.length < 2) {
     throw new Error('Game not found or not enough players')
@@ -70,14 +79,13 @@ async function startRound(supabase, game_id) {
 
   await supabase.from('cards').delete().eq('game_id', game_id)
   await supabase.from('cards').insert(dealtCards)
-  // Use turn_index only, since current_turn_id is not in schema
   await supabase.from('games').update({ status: 'bidding', turn_index: 0 }).eq('id', game_id)
   await supabase.from('players').update({ current_bid: null, tricks_won: 0 }).eq('game_id', game_id)
 }
 
 async function placeBid(supabase, game_id, player_id, bid) {
     const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
-    const { data: players } = await supabase.from('players').select('*').eq('game_id', game_id).order('id')
+    const players = await getSortedPlayers(supabase, game_id)
     
     if (players[game.turn_index].id !== player_id) throw new Error('Not your turn')
 
@@ -105,7 +113,7 @@ async function placeBid(supabase, game_id, player_id, bid) {
 
 async function playCard(supabase, game_id, player_id, card_id) {
     const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
-    const { data: players } = await supabase.from('players').select('*').eq('game_id', game_id).order('id')
+    const players = await getSortedPlayers(supabase, game_id)
     
     if (players[game.turn_index].id !== player_id) throw new Error('Not your turn')
 
@@ -142,7 +150,7 @@ async function playCard(supabase, game_id, player_id, card_id) {
 }
 
 async function resolveRound(supabase, game_id) {
-    const { data: players } = await supabase.from('players').select('*').eq('game_id', game_id)
+    const players = await getSortedPlayers(supabase, game_id)
     const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
 
     const playerUpdates = players.map(p => {
@@ -152,7 +160,7 @@ async function resolveRound(supabase, game_id) {
     })
     await Promise.all(playerUpdates)
 
-    const { data: updatedPlayers } = await supabase.from('players').select('*').eq('game_id', game_id)
+    const updatedPlayers = await getSortedPlayers(supabase, game_id)
     const alivePlayers = updatedPlayers.filter(p => p.lives > 0)
 
     if (alivePlayers.length <= 1 || game.current_round === 1) {
@@ -168,13 +176,14 @@ async function resolveRound(supabase, game_id) {
 }
 
 async function addBot(supabase, game_id) {
-    const { data: players } = await supabase.from('players').select('*').eq('game_id', game_id);
+    const players = await getSortedPlayers(supabase, game_id)
     const botId = `00000000-0000-0000-0000-${Math.floor(Math.random() * 1000000000000).toString(16).padStart(12, '0')}`;
     await supabase.from('players').insert({
         game_id,
         user_id: botId,
         name: `Bot ${players.length + 1}`,
-        lives: 5
+        lives: 5,
+        created_at: new Date()
     });
 }
 
@@ -186,7 +195,7 @@ async function processBotTurns(supabase, game_id) {
         const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
         if (!game || game.status === 'ended' || game.status === 'waiting') break
         
-        const { data: players } = await supabase.from('players').select('*').eq('game_id', game_id).order('id')
+        const players = await getSortedPlayers(supabase, game_id)
         const currentPlayer = players[game.turn_index]
         
         if (!currentPlayer || !currentPlayer.name.startsWith('Bot')) {

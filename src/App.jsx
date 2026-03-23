@@ -33,12 +33,21 @@ export default function App() {
     const { data: gData } = await supabase.from('games').select('*').eq('id', gameId).single();
     if (gData) setGame(gData);
 
-    // 2. Fetch Players
-    const { data: pData } = await supabase.from('players').select('*').eq('game_id', gameId).order('id');
-    setPlayers(pData || []);
+    // 2. Fetch Players (Sorted by creation to ensure stable order)
+    const { data: pData } = await supabase.from('players')
+      .select('*')
+      .eq('game_id', gameId)
+      .order('created_at', { ascending: true });
+    
+    // Fallback to ID sorting if created_at is missing for some rows
+    const sortedPData = (pData || []).sort((a,b) => {
+      if (a.created_at && b.created_at) return new Date(a.created_at) - new Date(b.created_at);
+      return a.id.localeCompare(b.id);
+    });
+    setPlayers(sortedPData);
 
     // 3. Fetch My Cards
-    const me = (pData || []).find(p => p.user_id === userId);
+    const me = sortedPData.find(p => p.user_id === userId);
     if (me) {
       const { data: hand } = await supabase.from('cards')
         .select('*')
@@ -99,19 +108,19 @@ export default function App() {
 
     const fetchWaitingGames = async () => {
       const { data } = await supabase.from('games').select('*, players(count)').eq('status', 'waiting');
-      setWaitingGames(data || []);
+      // FILTER GHOST ROOMS: Only show games where at least 1 player is present
+      const activeWaiting = (data || []).filter(g => g.players?.[0]?.count > 0);
+      setWaitingGames(activeWaiting);
     };
 
     const lobbyChannel = supabase
       .channel('lobby_sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, fetchWaitingGames)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchWaitingGames)
       .subscribe();
 
     fetchWaitingGames();
-
-    return () => {
-      supabase.removeChannel(lobbyChannel);
-    };
+    return () => { supabase.removeChannel(lobbyChannel); };
   }, [session?.user?.id]);
 
   useEffect(() => {
@@ -123,9 +132,16 @@ export default function App() {
 
   const createGame = async () => {
     if (!session?.user) return;
+    const name = window.prompt('¿Qué nombre quieres para la sala?', 'Mesa de ' + session.user.email.split('@')[0]);
+    if (name === null) return; // Cancelled
+    
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('games').insert({ status: 'waiting' }).select().single();
+      const { data, error } = await supabase.from('games').insert({ 
+        status: 'waiting',
+        name: name || 'Nueva Mesa',
+        host_id: session.user.id
+      }).select().single();
       if (error) throw error;
       joinGame(data.id);
     } catch (err) { alert(err.message); } finally { setLoading(false); }
@@ -137,7 +153,13 @@ export default function App() {
     try {
       const { data: existingPlayer } = await supabase.from('players').select('*').eq('game_id', gameId).eq('user_id', session.user.id).maybeSingle();
       if (!existingPlayer) {
-        await supabase.from('players').insert({ user_id: session.user.id, game_id: gameId, name: session.user.email.split('@')[0], lives: 5 });
+        await supabase.from('players').insert({ 
+          user_id: session.user.id, 
+          game_id: gameId, 
+          name: session.user.email.split('@')[0], 
+          lives: 5,
+          created_at: new Date()
+        });
       }
       fetchGameState(gameId, session.user.id);
     } catch (err) { alert(err.message); } finally { setLoading(false); }
@@ -147,9 +169,8 @@ export default function App() {
   if (!session?.user) return <Auth />;
 
   const me = (players || []).find(p => p.user_id === session.user.id);
-  const humanPlayers = (players || []).filter(p => !p.name.startsWith('Bot'));
-  const isHost = humanPlayers[0]?.user_id === session.user.id;
-  const sortedPlayers = [...(players || [])].sort((a,b) => a.id.localeCompare(b.id));
+  const isHost = game?.host_id === session.user.id; // Stable host check
+  const sortedPlayers = [...(players || [])]; // Already sorted by created_at in fetchGameState
   const currentPlayer = sortedPlayers[game?.turn_index || 0];
   const isMyTurn = currentPlayer?.id === me?.id;
   const everyoneBid = players.length > 0 && players.every(p => p.current_bid !== null);
@@ -208,7 +229,6 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Menu Lateral */}
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed inset-y-0 right-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[60] border-l border-white/10 p-8 shadow-2xl shadow-black">
@@ -251,6 +271,7 @@ export default function App() {
                     <div className="text-left font-black uppercase text-3xl">Crear Sala</div>
                  </div>
               </button>
+              
               <div className="bg-white/5 border border-white/10 p-8 rounded-[3rem] flex flex-col gap-6">
                 <div className="flex items-center justify-between"><h2 className="text-2xl font-black italic uppercase tracking-tighter">Mesas Disponibles</h2><Users className="text-red-500" /></div>
                 
@@ -265,11 +286,11 @@ export default function App() {
                         className="w-full flex items-center justify-between p-6 bg-white/5 hover:bg-white/10 border border-white/5 rounded-3xl transition-all group"
                       >
                         <div className="text-left">
-                           <p className="font-black text-lg text-slate-200">Mesa #{g.id.substring(0,4).toUpperCase()}</p>
+                           <p className="font-black text-lg text-slate-200 line-clamp-1">{g.name || 'Mesa Sin Nombre'}</p>
                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{g.players?.[0]?.count || 0} / 4 Jugadores</p>
                         </div>
                         <div className="p-3 bg-red-600/10 text-red-500 rounded-2xl group-hover:bg-red-600 group-hover:text-white transition-all">
-                          <Plus className="w-5 h-5" />
+                          <Plus className="w-5 h-5 text-current" />
                         </div>
                       </motion.button>
                     ))}
@@ -293,7 +314,7 @@ export default function App() {
                 {players.map(p => (
                   <div key={p.id} className={`p-2 rounded-2xl border transition-all ${currentPlayer?.id === p.id ? 'bg-red-600 border-red-400' : 'bg-white/5 border-white/10'}`}>
                     <div className="flex flex-col items-center gap-1">
-                       <span className="text-[8px] font-black uppercase opacity-60 tracking-widest">{p.name === me?.name ? 'TÚ' : p.name.substring(0,8)}</span>
+                       <span className="text-[8px] font-black uppercase opacity-60 tracking-widest">{p.user_id === session.user.id ? 'TÚ' : p.name.substring(0,8)}</span>
                        <div className="flex gap-0.5">
                          {[...Array(p.lives)].map((_, i) => <Heart key={i} className={`w-2 h-2 ${currentPlayer?.id === p.id ? 'fill-white' : 'fill-red-500'}`} />)}
                        </div>
@@ -324,7 +345,6 @@ export default function App() {
             </div>
 
             <div className="mt-8">
-               {/* UI REFACTOR: Hand ALWAYS visible above bidding buttons */}
                {(view === 'bidding' || view === 'playing') && (
                  <div className="flex flex-col items-center gap-12">
                     <div className="flex flex-col items-center gap-4 w-full">
@@ -336,7 +356,7 @@ export default function App() {
                               card={c} 
                               onClick={() => isMyTurn && everyoneBid && view === 'playing' && playCard(c.id)}
                               disabled={!isMyTurn || !everyoneBid || view !== 'playing'}
-                              isBlind={false} // User wants to see cards!
+                              isBlind={false}
                             />
                           ))}
                        </div>
@@ -361,7 +381,7 @@ export default function App() {
                {view === 'lobby' && (
                  <div className="flex flex-col sm:flex-row justify-center gap-4">
                     {isHost && players.length < 4 && <button onClick={addBot} className="bg-red-600/20 text-red-500 border border-red-500/20 px-8 py-5 rounded-3xl font-black text-xl active:scale-95 transition-all">AÑADIR BOT</button>}
-                    {isHost && players.length >= 2 && <button onClick={startGame} className="bg-green-600 text-white px-12 py-5 rounded-3xl font-black text-xl shadow-xl shadow-green-900/40 active:scale-95 transition-all">COMENZAR</button>}
+                    {isHost && players.length >= 2 && <button onClick={startGame} className="bg-green-600 text-white px-12 py-5 rounded-3xl font-black text-xl shadow-xl shadow-green-900/40 active:scale-95 transition-all uppercase italic">Comenzar Partida</button>}
                     <button onClick={backToLobby} className="bg-white/5 text-white border border-white/10 px-8 py-5 rounded-3xl font-black text-xl active:scale-95 transition-all">VOLVER AL MENU</button>
                  </div>
                )}
@@ -372,7 +392,7 @@ export default function App() {
         {view === 'ended' && (
           <div className="flex flex-col items-center justify-center min-h-[70vh] gap-8">
              <Trophy className="w-32 h-32 text-amber-500 shadow-2xl shadow-amber-900" />
-             <h1 className="text-6xl font-black italic">FIN PARTIDA</h1>
+             <h1 className="text-6xl font-black italic uppercase">Fin de la mesa</h1>
              <div className="w-full max-w-md space-y-4">
                {players.sort((a,b) => b.lives - a.lives).map((p, i) => (
                  <div key={p.id} className={`flex items-center justify-between p-6 rounded-[2rem] border ${i === 0 ? 'bg-amber-600/20 border-amber-500/50' : 'bg-white/5 border-white/10'}`}>
@@ -381,7 +401,7 @@ export default function App() {
                  </div>
                ))}
              </div>
-             <button onClick={() => { setGame(null); setView('lobby'); }} className="bg-white text-black px-12 py-5 rounded-3xl font-black text-xl hover:bg-red-600 hover:text-white transition-all">REINTENTAR</button>
+             <button onClick={() => { setGame(null); setView('lobby'); }} className="bg-white text-black px-12 py-5 rounded-3xl font-black text-xl hover:bg-red-600 hover:text-white transition-all uppercase">Reintentar</button>
           </div>
         )}
       </main>

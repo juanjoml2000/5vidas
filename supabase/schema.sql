@@ -11,7 +11,9 @@ CREATE TABLE games (
   turn_index INTEGER DEFAULT 0,
   dealer_id UUID, -- Who deals this round
   winner_id UUID,
-  last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  host_id UUID, -- The user who created the room
+  name TEXT -- Custom room name
 );
 
 -- Players table: participants in each game
@@ -25,6 +27,7 @@ CREATE TABLE players (
   tricks_won INTEGER DEFAULT 0,
   order_index INTEGER, -- Turn order
   is_ready BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(game_id, order_index)
 );
 
