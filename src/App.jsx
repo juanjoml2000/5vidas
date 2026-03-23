@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase';
 import Card from './components/Card';
 import Auth from './components/Auth';
-import { Heart, Trophy, Users, Play, Plus, LogOut, Menu, X, Zap, User, Save, Info, Bot } from 'lucide-react';
+import { Heart, Trophy, Users, Play, Plus, LogOut, Menu, X, Zap, User, Save, Info, Bot, Share2, UserX } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function App() {
@@ -242,6 +242,18 @@ export default function App() {
     alert('¡Enlace de invitación copiado! Envíalo a tus amigos para que se unan.');
   };
 
+  const kickPlayer = async (targetId) => {
+    if (!confirm('¿Expulsar a este jugador de la mesa?')) return;
+    const { status } = await fetch('/api/game', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ action: 'kick-player', game_id: game.id, player_id: me.id, data: { target_id: targetId } }) 
+    });
+    if (status === 200) {
+      alert('Jugador expulsado');
+    }
+  };
+
   const leaveGame = async () => { if (confirm('¿Abandonar partida?')) { await supabase.from('players').delete().eq('id', me.id); setGame(null); setView('lobby'); } };
 
   return (
@@ -258,7 +270,12 @@ export default function App() {
         </div>
         <div className="flex items-center gap-2">
           {!game && <button onClick={() => setShowRules(true)} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-red-500"><Info className="w-6 h-6" /></button>}
-          {game && <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">{isMenuOpen ? <X /> : <Menu />}</button>}
+          {game && (
+            <>
+              <button onClick={copyInvite} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-emerald-500"><Share2 className="w-6 h-6" /></button>
+              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">{isMenuOpen ? <X /> : <Menu />}</button>
+            </>
+          )}
           <div className="h-8 w-px bg-white/10 mx-2" />
           <button onClick={logout} className="flex items-center gap-2 px-4 py-2 text-red-400 font-bold rounded-xl active:scale-95 transition-all"><LogOut className="w-5 h-5" /><span className="hidden sm:inline uppercase">Salir</span></button>
         </div>
@@ -267,22 +284,40 @@ export default function App() {
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed inset-y-0 right-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[60] border-l border-white/10 p-8 shadow-2xl shadow-black">
-             <div className="flex items-center justify-between mb-12"><h2 className="text-2xl font-black italic uppercase tracking-tighter">OPCIONES</h2><button onClick={() => setIsMenuOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button></div>
-              <div className="space-y-6">
-                  {isHost && (
-                    <button 
-                      disabled={game.status !== 'waiting'} 
-                      onClick={() => { setIsMenuOpen(false); addBot(); }} 
-                      className={`w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex flex-col items-center justify-center gap-1 active:scale-95 uppercase tracking-widest ${game.status === 'waiting' ? 'text-blue-400' : 'text-slate-600 opacity-50'}`}
-                    >
-                      <div className="flex items-center gap-3"><Bot className="w-5 h-5" /> AÑADIR BOT</div>
-                      {game.status !== 'waiting' && <span className="text-[8px] lowercase italic opacity-50">(Solo en Lobby)</span>}
-                    </button>
-                  )}
-                  <button onClick={() => { setIsMenuOpen(false); copyInvite(); }} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest text-emerald-400"><Plus className="w-5 h-5" /> INVITAR AMIGOS</button>
-                  <button onClick={() => { setIsMenuOpen(false); setShowRules(true); }} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Info className="w-5 h-5 text-red-500" /> REGLAS DEL JUEGO</button>
-                 <button onClick={() => { setIsMenuOpen(false); leaveGame(); }} className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-black py-4 rounded-2xl border border-red-500/20 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Zap className="w-5 h-5 fill-current" /> SALIR DE LA MESA</button>
-              </div>
+             <div className="flex items-center justify-between mb-12">
+                <h2 className="text-2xl font-black italic uppercase tracking-tighter">OPCIONES</h2>
+                <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button>
+             </div>
+             <div className="space-y-6">
+                {isHost && (
+                  <button 
+                    disabled={game.status !== 'waiting'} 
+                    onClick={() => { setIsMenuOpen(false); addBot(); }} 
+                    className={`w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex flex-col items-center justify-center gap-1 active:scale-95 uppercase tracking-widest ${game.status === 'waiting' ? 'text-blue-400' : 'text-slate-600 opacity-50'}`}
+                  >
+                    <div className="flex items-center gap-3"><Bot className="w-5 h-5" /> AÑADIR BOT</div>
+                    {game.status !== 'waiting' && <span className="text-[8px] lowercase italic opacity-50">(Solo en Lobby)</span>}
+                  </button>
+                )}
+                {isHost && players.length > 1 && (
+                  <div className="space-y-4 pt-4 border-t border-white/5">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2 text-center">Gestión de Mesa</p>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                      {players.filter(p => p.id !== me.id).map(p => (
+                        <div key={p.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm line-clamp-1">{p.name}</span>
+                            <span className="text-[8px] uppercase text-slate-500">{p.id.startsWith('bot-') || !p.user_id ? '🤖 Bot' : '👤 Humano'}</span>
+                          </div>
+                          <button onClick={() => kickPlayer(p.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-xl transition-all"><UserX className="w-5 h-5" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <button onClick={() => { setIsMenuOpen(false); setShowRules(true); }} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Info className="w-5 h-5 text-red-500" /> REGLAS DEL JUEGO</button>
+                <button onClick={() => { setIsMenuOpen(false); leaveGame(); }} className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-black py-4 rounded-2xl border border-red-500/20 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Zap className="w-5 h-5 fill-current" /> SALIR DE LA MESA (LEAVE)</button>
+             </div>
           </motion.div>
         )}
       </AnimatePresence>

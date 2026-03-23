@@ -33,6 +33,13 @@ export default async function handler(req, res) {
       case 'heartbeat':
          await supabase.from('players').update({ last_ping: new Date() }).eq('id', player_id)
          return res.status(200).json({ success: true })
+      case 'kick-player': {
+         const { data: g } = await supabase.from('games').select('host_id').eq('id', game_id).single();
+         const { data: p } = await supabase.from('players').select('user_id').eq('id', player_id).single();
+         if (!g || !p || g.host_id !== p.user_id) return res.status(403).json({ error: 'No autorizado' });
+         await supabase.from('players').delete().eq('id', data.target_id);
+         return res.status(200).json({ success: true })
+      }
       case 'get-other-cards':
          const { data: others } = await supabase.from('cards').select('*, player:players(name)').eq('game_id', game_id).neq('player_id', player_id)
          return res.status(200).json({ cards: others })
