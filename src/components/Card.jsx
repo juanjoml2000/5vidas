@@ -1,67 +1,81 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { motion } from 'framer-motion';
 
-// Helper to merge tailwind classes
-export function cn(...inputs) {
-  return twMerge(clsx(inputs));
-}
-
-const suitSymbols = {
-  oros: '🟡',
-  copas: '🍷',
-  espadas: '⚔️',
-  bastos: '🪵'
+const SUITS = {
+  oros: { icon: '🟡', color: 'text-yellow-400', label: 'Oros' },
+  copas: { icon: '🍷', color: 'text-red-400', label: 'Copas' },
+  espadas: { icon: '⚔️', color: 'text-blue-400', label: 'Espadas' },
+  bastos: { icon: '🌳', color: 'text-green-400', label: 'Bastos' },
 };
 
-const suitColors = {
-  oros: 'text-amber-500',
-  copas: 'text-rose-500',
-  espadas: 'text-sky-500',
-  bastos: 'text-emerald-700'
+const VALUES = {
+  1: 'As',
+  2: '2',
+  3: '3',
+  4: '4',
+  5: '5',
+  6: '6',
+  7: '7',
+  10: 'Sota',
+  11: 'Caballo',
+  12: 'Rey',
 };
 
-export function Card({ 
-    suit, 
-    value, 
-    faceUp = true, 
-    onClick, 
-    disabled = false, 
-    isSelected = false,
-    isBlind = false, // Round 1 rule: don't see your own card
-    className 
-}) {
+export default function Card({ card, onClick, disabled, isSelected, isFaceDown, isBlind }) {
+  if (isFaceDown) {
+    return (
+      <div className="w-24 h-36 md:w-32 md:h-48 bg-red-900 rounded-xl border-4 border-red-700 shadow-2xl flex items-center justify-center relative overflow-hidden group">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-800 to-red-950 opacity-50" />
+        <div className="relative text-red-700 font-black text-4xl transform -rotate-12 transition-transform group-hover:rotate-0">5</div>
+      </div>
+    );
+  }
+
+  const { suit, value } = card;
+  const suitData = SUITS[suit];
+
   return (
-    <motion.div
-      whileHover={faceUp && !disabled ? { y: -10, scale: 1.05 } : {}}
-      whileTap={faceUp && !disabled ? { scale: 0.95 } : {}}
-      onClick={!disabled ? onClick : undefined}
-      className={cn(
-        "game-card transition-shadow duration-300",
-        faceUp ? "card-face-up" : "card-face-down",
-        isSelected && "ring-4 ring-game-accent shadow-sky-500/50 -translate-y-4",
-        disabled && "opacity-50 grayscale cursor-default",
-        className
-      )}
+    <motion.button
+      whileHover={!disabled ? { y: -10, scale: 1.05 } : {}}
+      whileTap={!disabled ? { scale: 0.95 } : {}}
+      onClick={onClick}
+      disabled={disabled}
+      className={`
+        relative w-24 h-36 md:w-32 md:h-48 rounded-2xl flex flex-col items-center justify-between p-3 md:p-4
+        ${isSelected ? 'ring-4 ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.5)]' : 'shadow-xl'}
+        ${disabled && !isSelected ? 'opacity-40 grayscale pointer-events-none' : 'cursor-pointer'}
+        bg-white/95 backdrop-blur-sm border-2 border-white transition-all
+      `}
     >
-      {faceUp ? (
-        <>
-          <div className={cn("text-xl font-bold self-start", suitColors[suit])}>
-            {value === 10 ? 'Sota' : value === 11 ? 'Caballo' : value === 12 ? 'Rey' : value}
-          </div>
-          <div className="text-4xl">
-            {isBlind ? '❓' : suitSymbols[suit]}
-          </div>
-          <div className={cn("text-xl font-bold self-end rotate-180", suitColors[suit])}>
-            {value === 10 ? 'S' : value === 11 ? 'C' : value === 12 ? 'R' : value}
-          </div>
-        </>
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-            <div className="text-3xl opacity-20">🎴</div>
+      {/* Corner indicators */}
+      <div className="absolute top-2 left-2 text-left">
+        <div className={`text-lg md:text-xl font-bold ${suitData.color} leading-none`}>
+          {value === 10 || value === 11 || value === 12 ? VALUES[value][0] : value}
         </div>
-      )}
-    </motion.div>
+        <div className="text-xs md:text-sm">{suitData.icon}</div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-1">
+        <span className="text-3xl md:text-5xl drop-shadow-sm">{suitData.icon}</span>
+        {isBlind ? (
+          <span className="text-[10px] md:text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">
+            Ronda Ciega
+          </span>
+        ) : (
+          <span className={`text-xs md:text-sm font-black uppercase tracking-tight ${suitData.color}`}>
+            {VALUES[value]}
+          </span>
+        )}
+      </div>
+
+      {/* Bottom corner */}
+      <div className="absolute bottom-2 right-2 flex flex-col items-end rotate-180">
+        <div className={`text-lg md:text-xl font-bold ${suitData.color} leading-none`}>
+          {value === 10 || value === 11 || value === 12 ? VALUES[value][0] : value}
+        </div>
+        <div className="text-xs md:text-sm">{suitData.icon}</div>
+      </div>
+    </motion.button>
   );
 }

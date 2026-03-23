@@ -1,325 +1,448 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase';
-import { Card } from './components/Card';
+import Card from './components/Card';
+import Auth from './components/Auth';
+import { Heart, Trophy, Users, Play, Plus, LogOut, Menu, X, ShieldAlert, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Heart, Users, MessageSquare, Play, Plus, LogIn, Send } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function App() {
-  const [user, setUser] = useState({ id: crypto.randomUUID(), name: '' });
-  const [gameId, setGameId] = useState(null);
-  const [gameState, setGameState] = useState(null);
+  const [session, setSession] = useState(null);
+  const [game, setGame] = useState(null);
   const [players, setPlayers] = useState([]);
-  const [myPlayer, setMyPlayer] = useState(null);
   const [myCards, setMyCards] = useState([]);
-  const [tableCards, setTableCards] = useState([]);
-  const [view, setView] = useState('lobby'); // 'lobby', 'bidding', 'playing', 'ended'
+  const [tricks, setTricks] = useState([]);
+  const [view, setView] = useState('lobby'); // lobby, bidding, playing, ended
   const [loading, setLoading] = useState(false);
-
-  // 1. Session persistence
-  useEffect(() => {
-    const saved = localStorage.getItem('v5_user');
-    if (saved) setUser(JSON.parse(saved));
-  }, []);
-
-  const saveUser = (name) => {
-    const newUser = { ...user, name };
-    setUser(newUser);
-    localStorage.setItem('v5_user', JSON.stringify(newUser));
-  };
-
-  // 2. Realtime Subscriptions
-  useEffect(() => {
-    if (!gameId) return;
-
-    const gameSub = supabase.channel(`game:${gameId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, (payload) => {
-        setGameState(payload.new);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` }, () => {
-        fetchPlayers();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cards', filter: `game_id=eq.${gameId}` }, () => {
-        fetchCards();
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(gameSub); };
-  }, [gameId]);
-
-  const fetchGameState = async (id) => {
-    const { data } = await supabase.from('games').select('*').eq('id', id).single();
-    if (data) setGameState(data);
-  };
-
-  const fetchPlayers = async () => {
-    const { data } = await supabase.from('players').select('*').eq('game_id', gameId).order('order_index');
-    if (data) {
-        setPlayers(data);
-        const me = data.find(p => p.user_id === user.id);
-        setMyPlayer(me);
-    }
-  };
-
-  const fetchCards = async () => {
-    const { data: cards } = await supabase.from('cards').select('*').eq('game_id', gameId);
-    if (cards) {
-        setMyCards(cards.filter(c => c.player_id === myPlayer?.id && !c.is_played));
-        setTableCards(cards.filter(c => c.is_played).sort((a,b) => new Date(a.played_at) - new Date(b.played_at)));
-    }
-  };
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (gameId && myPlayer) {
-        fetchCards();
-    }
-  }, [gameId, myPlayer]);
-
-  // 3. Game Actions
-  const createGame = async () => {
-    if (!user.name) return alert('Dime tu nombre primero');
-    setLoading(true);
-    const { data: game, error } = await supabase.from('games').insert({ status: 'waiting' }).select().single();
-    if (error) return console.error(error);
-    
-    await joinGame(game.id);
-    setLoading(false);
-  };
-
-  const joinGame = async (id) => {
-    if (!user.name) return alert('Dime tu nombre primero');
-    setGameId(id);
-    const { data: existingPlayers } = await supabase.from('players').select('*').eq('game_id', id);
-    if (existingPlayers.some(p => p.user_id === user.id)) {
-        setView('waiting');
-        fetchGameState(id);
-        fetchPlayers();
-        return;
-    }
-
-    const { error } = await supabase.from('players').insert({
-        game_id: id,
-        user_id: user.id,
-        name: user.name,
-        order_index: existingPlayers.length,
-        lives: 5
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
     });
 
-    if (error) return alert('Partida llena o error');
-    setView('waiting');
-    fetchGameState(id);
-    fetchPlayers();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Fetch and Subscribe to Game Data
+  useEffect(() => {
+    if (!session || !game?.id) return;
+
+    const gameChannel = supabase
+      .channel(`game:${game.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${game.id}` }, 
+        (payload) => setGame(payload.new))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${game.id}` }, 
+        async () => {
+          const { data } = await supabase.from('players').select('*').eq('game_id', game.id).order('joined_at');
+          setPlayers(data || []);
+        })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cards', filter: `player_id=eq.${session.user.id}` }, 
+        async () => {
+          const { data } = await supabase.from('cards').select('*').eq('player_id', session.user.id).eq('is_played', false);
+          setMyCards(data || []);
+        })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tricks', filter: `game_id=eq.${game.id}` }, 
+        async () => {
+          const { data } = await supabase.from('tricks').select('*, card:cards(*)').eq('game_id', game.id).eq('round_number', game.current_round).order('played_at');
+          setTricks(data || []);
+        })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(gameChannel);
+    };
+  }, [game?.id, session]);
+
+  // Handle Game Logic Transitions
+  useEffect(() => {
+    if (game?.status === 'bidding') setView('bidding');
+    else if (game?.status === 'playing') setView('playing');
+    else if (game?.status === 'ended') setView('ended');
+    else if (game?.status === 'lobby') setView('lobby');
+  }, [game?.status]);
+
+  const createGame = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('games').insert({ status: 'lobby' }).select().single();
+      if (error) throw error;
+      joinGame(data.id);
+    } catch (err) {
+      alert('Error al crear partida: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const joinGame = async (gameId) => {
+    setLoading(true);
+    try {
+      // Create or get player
+      const { data: existingPlayer } = await supabase.from('players').select('*').eq('game_id', gameId).eq('id', session.user.id).single();
+      
+      if (!existingPlayer) {
+        const { error: joinError } = await supabase.from('players').insert({
+          id: session.user.id,
+          game_id: gameId,
+          name: session.user.email.split('@')[0], // Use part of email as name
+          lives: 5
+        });
+        if (joinError) throw joinError;
+      }
+
+      const { data: gData } = await supabase.from('games').select('*').eq('id', gameId).single();
+      setGame(gData);
+      
+      const { data: pData } = await supabase.from('players').select('*').eq('game_id', gameId).order('joined_at');
+      setPlayers(pData || []);
+    } catch (err) {
+      alert('Error al unirse: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const startGame = async () => {
     await fetch('/api/game', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'start-round', game_id: gameId })
+      method: 'POST',
+      body: JSON.stringify({ action: 'start-round', gameId: game.id })
     });
   };
 
   const placeBid = async (bid) => {
     await fetch('/api/game', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'place-bid', game_id: gameId, player_id: myPlayer.id, data: { bid } })
+      method: 'POST',
+      body: JSON.stringify({ action: 'place-bid', gameId: game.id, playerId: session.user.id, bid })
     });
   };
 
   const playCard = async (cardId) => {
     await fetch('/api/game', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'play-card', game_id: gameId, player_id: myPlayer.id, data: { card_id: cardId } })
+      method: 'POST',
+      body: JSON.stringify({ action: 'play-card', gameId: game.id, playerId: session.user.id, cardId })
     });
   };
 
-  // 4. Computed State
-  const isMyTurn = useMemo(() => {
-    if (!gameState || !players.length) return false;
-    return players[gameState.turn_index]?.user_id === user.id;
-  }, [gameState, players, user.id]);
+  const leaveGame = async () => {
+    if (confirm('¿Seguro que quieres abandonar la partida? Perderás tu progreso.')) {
+      setLoading(true);
+      await supabase.from('players').delete().eq('id', session.user.id).eq('game_id', game.id);
+      setGame(null);
+      setView('lobby');
+      setLoading(false);
+    }
+  };
 
-  // 1 card round logic: players see OTHERS cards but not their own
-  const isBlindRound = gameState?.current_round === 1;
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
 
-  // Renderers
-  if (!user.name && view === 'lobby') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-[grid]">
-        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass p-8 rounded-2xl w-full max-w-md">
-            <h1 className="text-4xl font-black mb-2 text-center bg-gradient-to-r from-game-accent to-game-gold bg-clip-text text-transparent">5 VIDAS</h1>
-            <p className="text-slate-400 text-center mb-8">El juego de bazas y traición</p>
-            <div className="space-y-4">
-                <input 
-                    type="text" 
-                    placeholder="Tu apodo..." 
-                    className="w-full bg-slate-800 border-2 border-slate-700 rounded-xl px-4 py-3 outline-none focus:border-game-accent transition-colors"
-                    onKeyDown={(e) => e.key === 'Enter' && saveUser(e.target.value)}
-                    onBlur={(e) => saveUser(e.target.value)}
-                />
-                <button onClick={() => user.name && setView('lobby')} className="btn-primary w-full">Entrar</button>
-            </div>
-        </motion.div>
-      </div>
-    );
-  }
+  if (!session) return <Auth />;
 
-  if (view === 'lobby') {
-    return (
-      <div className="min-h-screen p-8 max-w-4xl mx-auto">
-        <header className="flex justify-between items-center mb-12">
-            <div>
-                <h1 className="text-3xl font-black italic">5 VIDAS</h1>
-                <p className="opacity-50">Hola, {user.name} 👋</p>
-            </div>
-            <button onClick={createGame} disabled={loading} className="btn-primary flex items-center gap-2">
-                <Plus size={20} /> Crear Partida
-            </button>
-        </header>
+  const me = players.find(p => p.id === session.user.id);
+  const isMyTurn = game?.current_turn_id === session.user.id;
+  const everyoneBid = players.every(p => p.current_bid !== null);
 
-        <section className="grid gap-4">
-            <h2 className="text-xl font-bold flex items-center gap-2"><Send size={18} /> O únete a una:</h2>
-            <div className="grid gap-3">
-                <ActiveGames onJoin={joinGame} />
-            </div>
-        </section>
-      </div>
-    );
-  }
-
-  // GAME VIEW
   return (
-    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-slate-900 via-game-dark to-black">
-      {/* HUD Header */}
-      <nav className="p-4 glass sticky top-0 z-50 flex justify-between items-center">
-         <div className="flex gap-4">
-            {players.map(p => (
-                <div key={p.id} className={cn("p-2 rounded-lg transition-all", p.id === players[gameState?.turn_index]?.id ? "bg-game-accent/20 ring-1 ring-game-accent" : "bg-black/20")}>
-                    <div className="text-xs font-bold truncate w-20">{p.name} {p.user_id === user.id && '(Tú)'}</div>
-                    <div className="flex gap-1">
-                        {[...Array(5)].map((_, i) => (
-                            <Heart key={i} size={10} fill={i < p.lives ? "#ef4444" : "none"} className={i < p.lives ? "text-danger" : "text-slate-600"} />
-                        ))}
-                    </div>
-                </div>
-            ))}
-         </div>
-         <div className="text-right">
-            <div className="text-sm font-bold opacity-50">Ronda de:</div>
-            <div className="text-2xl font-black">{gameState?.current_round} cartas</div>
-         </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-red-500/30 overflow-x-hidden">
+      {/* Background Decor */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-20">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-600/30 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-600/30 blur-[120px] rounded-full" />
+      </div>
+
+      {/* Navigation */}
+      <nav className="relative z-50 flex items-center justify-between px-6 py-4 bg-black/40 backdrop-blur-xl border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-red-900/40">
+            <span className="text-xl font-black italic">5</span>
+          </div>
+          <span className="text-xl font-black tracking-tighter uppercase hidden sm:block">5 VIDAS</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {game && (
+            <button 
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+            >
+              {isMenuOpen ? <X /> : <Menu />}
+            </button>
+          )}
+          <div className="h-8 w-px bg-white/10 mx-2" />
+          <button 
+            onClick={logout}
+            className="flex items-center gap-2 px-4 py-2 hover:bg-red-500/10 text-red-400 font-bold rounded-xl transition-all active:scale-95"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="hidden sm:inline">Salir</span>
+          </button>
+        </div>
       </nav>
 
-      <main className="flex-1 flex flex-col items-center justify-center gap-8 p-4">
-        {/* Table Area */}
-        <div className="relative w-full max-w-2xl h-64 bg-black/10 rounded-[100px] border border-white/5 flex items-center justify-center">
-            <AnimatePresence>
-                {tableCards.map((c, i) => (
-                    <motion.div 
-                        key={c.id} 
-                        initial={{ y: 100, opacity: 0, rotate: i * 10 }}
-                        animate={{ y: 0, opacity: 1, x: (i - (tableCards.length-1)/2) * 40 }}
-                        className="absolute"
-                    >
-                        <Card suit={c.suit} value={c.value} className="w-24 h-36" />
-                        <div className="text-[10px] text-center mt-1 font-bold opacity-50">{players.find(p => p.id === c.player_id)?.name}</div>
-                    </motion.div>
-                ))}
-            </AnimatePresence>
-            {tableCards.length === 0 && (
-                <div className="text-slate-600 font-medium italic select-none">La mesa espera...</div>
-            )}
-        </div>
+      {/* Side Menu */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            className="fixed inset-y-0 right-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[60] border-l border-white/10 p-8 shadow-2xl shadow-black"
+          >
+            <div className="flex items-center justify-between mb-12">
+              <h2 className="text-2xl font-black tracking-tight">OPCIONES</h2>
+              <button onClick={() => setIsMenuOpen(false)} className="p-2 hover:bg-white/10 rounded-full">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
 
-        {/* Action HUD */}
-        <AnimatePresence mode="wait">
-            {gameState?.status === 'waiting' && myPlayer?.order_index === 0 && (
-                <motion.button 
-                    initial={{ scale: 0.8 }} animate={{ scale: 1 }}
-                    onClick={startGame} className="btn-primary text-xl px-12 py-4"
-                >
-                    Repartir y Empezar
-                </motion.button>
-            )}
-
-            {gameState?.status === 'bidding' && isMyTurn && (
-                <motion.div initial={{ y: 20 }} animate={{ y: 0 }} className="glass p-6 rounded-2xl">
-                    <h3 className="text-center font-bold mb-4">¿Cuántas bazas ganarás?</h3>
-                    <div className="flex gap-2">
-                        {[...Array(gameState.current_round + 1)].map((_, i) => (
-                            <button 
-                                key={i} onClick={() => placeBid(i)}
-                                className="w-12 h-12 rounded-lg bg-game-card hover:bg-game-accent text-xl font-black transition-colors"
-                            >
-                                {i}
-                            </button>
-                        ))}
+            <div className="space-y-6">
+              <div className="p-6 bg-white/5 rounded-3xl border border-white/10">
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-4">Jugador</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-amber-500 rounded-2xl flex items-center justify-center font-bold text-xl">
+                    {me?.name[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-bold text-lg">{me?.name}</p>
+                    <div className="flex items-center gap-1 text-red-500">
+                      {[...Array(me?.lives || 0)].map((_, i) => <Heart key={i} className="w-4 h-4 fill-current" />)}
                     </div>
-                </motion.div>
-            )}
-        </AnimatePresence>
-
-        {/* Score Board */}
-        <div className="grid grid-cols-2 gap-4 w-full max-w-md">
-            {players.map(p => (
-                <div key={p.id} className="glass p-3 rounded-xl flex justify-between items-center">
-                    <span className="text-xs font-medium">{p.name}</span>
-                    <div className="flex gap-3">
-                        <div className="text-center">
-                            <div className="text-[10px] uppercase opacity-50">Apuesta</div>
-                            <div className="font-black text-game-accent">{p.current_bid ?? '-'}</div>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-[10px] uppercase opacity-50">Bazas</div>
-                            <div className="font-black text-game-gold">{p.tricks_won}</div>
-                        </div>
-                    </div>
+                  </div>
                 </div>
-            ))}
-        </div>
-      </main>
+              </div>
 
-      {/* Player Hand */}
-      <footer className="p-8 pb-12 flex justify-center items-center gap-4 relative">
-         <div className="flex gap-2 isolate">
-            {myCards.map((c, i) => (
-                <Card 
-                    key={c.id} 
-                    suit={c.suit} 
-                    value={c.value} 
-                    disabled={!isMyTurn || gameState.status !== 'playing'}
-                    isBlind={isBlindRound}
-                    onClick={() => playCard(c.id)}
-                    className="hover:-translate-y-8"
-                />
-            ))}
-         </div>
-      </footer>
+              <button 
+                onClick={() => { setIsMenuOpen(false); leaveGame(); }}
+                className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-bold py-5 rounded-3xl border border-red-500/20 transition-all flex items-center justify-center gap-3"
+              >
+                <Zap className="w-6 h-6" />
+                Abandonar Partida
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <main className="relative z-10 p-4 max-w-5xl mx-auto">
+        {view === 'lobby' && (
+          <div className="py-12 flex flex-col items-center gap-12">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center"
+            >
+              <h1 className="text-6xl md:text-8xl font-black tracking-tighter italic text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40 mb-4 drop-shadow-2xl">
+                5 VIDAS
+              </h1>
+              <p className="text-red-400 font-bold tracking-[0.3em] uppercase opacity-80">El Clásico de Cartas</p>
+            </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-3xl">
+              <button
+                onClick={createGame}
+                disabled={loading}
+                className="group relative bg-white/5 hover:bg-white/10 border border-white/10 p-8 rounded-[2.5rem] transition-all active:scale-[0.98] overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 p-8 opacity-5 transition-transform group-hover:scale-150 group-hover:rotate-12">
+                  <Plus className="w-32 h-32" />
+                </div>
+                <div className="relative z-10 flex flex-col items-start gap-4">
+                  <div className="p-4 bg-red-600 rounded-3xl shadow-lg shadow-red-900/40">
+                    <Plus className="w-8 h-8 font-black" />
+                  </div>
+                  <div className="text-left">
+                    <h2 className="text-3xl font-black tracking-tight mb-2">CREAR</h2>
+                    <p className="text-slate-400 font-medium">Nueva mesa de juego</p>
+                  </div>
+                </div>
+              </button>
+
+              <div className="bg-white/5 border border-white/10 p-8 rounded-[2.5rem] flex flex-col gap-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-black tracking-tight">SALAS ACTIVAS</h2>
+                  <Users className="w-6 h-6 text-red-500" />
+                </div>
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                  {/* Join logic would go here, simplified show list */}
+                  <p className="text-slate-500 text-center py-8 bg-black/20 rounded-3xl border border-dashed border-white/10">No hay salas disponibles</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {game && view !== 'lobby' && (
+          <div className="flex flex-col gap-6 pt-4">
+            {/* Header: Game Info */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/5 backdrop-blur-md border border-white/10 p-4 md:p-6 rounded-3xl shadow-xl">
+              <div className="flex items-center gap-4">
+                <div className="px-4 py-2 bg-red-600 rounded-2xl font-black shadow-lg shadow-red-950/40">
+                  RONDA {game.current_round}
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-2xl border border-white/10 font-bold text-slate-300">
+                  <Trophy className="w-5 h-5 text-amber-500" />
+                  {tricks.length} Bazas Tiradas
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                {players.map(p => (
+                  <motion.div 
+                    key={p.id}
+                    animate={{ scale: game.current_turn_id === p.id ? 1.1 : 1 }}
+                    className={`relative p-3 rounded-2xl border transition-all ${game.current_turn_id === p.id ? 'bg-red-600 border-red-400 shadow-lg shadow-red-900/40' : 'bg-white/5 border-white/10'}`}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-[10px] uppercase font-black tracking-widest opacity-60">
+                        {p.id === session.user.id ? 'TÚ' : p.name.substring(0, 8)}
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        {[...Array(p.lives)].map((_, i) => <Heart key={i} className={`w-3 h-3 ${game.current_turn_id === p.id ? 'fill-white' : 'fill-red-500'}`} />)}
+                      </div>
+                      {p.current_bid !== null && (
+                        <span className="text-xs font-bold mt-1 bg-black/20 px-2 py-0.5 rounded-full">
+                          {p.tricks_won || 0}/{p.current_bid}
+                        </span>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* Main Play Area */}
+            <div className="relative min-h-[40vh] md:min-h-[50vh] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 to-black/80 rounded-[3rem] border border-white/5 flex items-center justify-center p-8 overflow-hidden">
+               {/* Table center */}
+               <div className="flex flex-wrap justify-center gap-4 relative z-10">
+                <AnimatePresence>
+                  {tricks.map(t => (
+                    <motion.div 
+                      key={t.id}
+                      initial={{ scale: 0, rotate: -45, y: 50 }}
+                      animate={{ scale: 1, rotate: 0, y: 0 }}
+                      className="relative"
+                    >
+                      <Card card={t.card} disabled />
+                      <div className="absolute -top-3 -right-3 px-2 py-1 bg-red-600 rounded-lg text-[10px] font-black uppercase shadow-lg">
+                        {players.find(p => p.id === t.player_id)?.name.split('@')[0]}
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                
+                {tricks.length === 0 && game.status === 'playing' && (
+                  <div className="text-slate-700 font-black text-4xl md:text-6xl tracking-tighter opacity-10 select-none">TABLERO</div>
+                )}
+               </div>
+
+               {/* Turn Alert */}
+               {isMyTurn && (
+                 <motion.div 
+                   animate={{ scale: [1, 1.05, 1] }} 
+                   transition={{ repeat: Infinity, duration: 2 }}
+                   className="absolute top-12 left-1/2 -translate-x-1/2 px-6 py-3 bg-amber-500 rounded-full text-black font-black text-sm tracking-widest shadow-2xl flex items-center gap-2"
+                 >
+                   <Zap className="w-4 h-4 fill-current" /> ES TU TURNO
+                 </motion.div>
+               )}
+            </div>
+
+            {/* Interaction Area (Cards or Bidding) */}
+            <div className="mt-4 pb-12">
+              {view === 'bidding' && (
+                <motion.div 
+                  initial={{ y: 50, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 md:p-12 shadow-2xl"
+                >
+                  <h3 className="text-center text-3xl font-black tracking-tight mb-8">¿CUÁNTAS BAZAS GANARÁS?</h3>
+                  <div className="flex flex-wrap justify-center gap-3 md:gap-4">
+                    {[...Array(game.current_round + 1)].map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => placeBid(i)}
+                        disabled={loading || me?.current_bid !== null}
+                        className={`
+                          w-14 h-14 md:w-20 md:h-20 rounded-2xl md:rounded-3xl border-2 transition-all active:scale-95 font-black text-xl md:text-2xl
+                          ${me?.current_bid === i ? 'bg-red-600 border-red-400 text-white shadow-xl shadow-red-900/40' : 'bg-white/5 border-white/10 hover:bg-white/10'}
+                          ${me?.current_bid !== null && me?.current_bid !== i ? 'opacity-30' : ''}
+                        `}
+                      >
+                        {i}
+                      </button>
+                    ))}
+                  </div>
+                  {me?.current_bid !== null && !everyoneBid && (
+                    <p className="text-center mt-8 text-amber-500 font-bold animate-pulse tracking-wide italic">Esperando apuestas de los demás...</p>
+                  )}
+                </motion.div>
+              )}
+
+              {view === 'playing' && (
+                <div className="flex flex-wrap justify-center gap-2 md:gap-4 px-4 overflow-x-auto pb-4 pt-8 md:pt-12">
+                   {myCards.map(c => (
+                     <Card 
+                       key={c.id} 
+                       card={c} 
+                       onClick={() => isMyTurn && everyoneBid && playCard(c.id)}
+                       disabled={!isMyTurn || !everyoneBid}
+                       isBlind={game.current_round === 1}
+                     />
+                   ))}
+                </div>
+              )}
+
+              {view === 'lobby' && players.length >= 2 && game.host_id === session.user.id && (
+                <div className="flex justify-center pt-8">
+                  <button
+                    onClick={startGame}
+                    className="bg-green-600 hover:bg-green-500 px-12 py-5 rounded-3xl font-black text-xl shadow-xl shadow-green-900/40 transition-all active:scale-95 flex items-center gap-3"
+                  >
+                    <Play className="w-8 h-8 fill-current" /> COMENZAR PARTIDA
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {view === 'ended' && (
+          <div className="flex flex-col items-center justify-center min-h-[70vh] gap-8">
+            <Trophy className="w-32 h-32 text-amber-500 drop-shadow-[0_0_30px_rgba(245,158,11,0.5)]" />
+            <div className="text-center">
+              <h1 className="text-6xl font-black tracking-tighter mb-2 italic">FIN DEL JUEGO</h1>
+              <p className="text-slate-400 font-bold uppercase tracking-widest">¡Partida Finalizada!</p>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-4 w-full max-w-md">
+               {players.sort((a,b) => b.lives - a.lives).map((p, i) => (
+                 <div key={p.id} className={`flex items-center justify-between p-6 rounded-3xl border ${i === 0 ? 'bg-amber-600/20 border-amber-500/50' : 'bg-white/5 border-white/10'}`}>
+                    <div className="flex items-center gap-4">
+                       <span className={`text-2xl font-black ${i === 0 ? 'text-amber-500' : 'text-slate-500'}`}>#{i+1}</span>
+                       <span className="font-bold text-xl uppercase tracking-tight">{p.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-red-500">
+                      {[...Array(p.lives)].map((_, i) => <Heart key={i} className="w-5 h-5 fill-current" />)}
+                    </div>
+                 </div>
+               ))}
+            </div>
+
+            <button
+              onClick={() => { setGame(null); setView('lobby'); }}
+              className="mt-8 bg-white text-black font-black px-12 py-5 rounded-3xl text-xl hover:bg-red-500 hover:text-white transition-all active:scale-95 shadow-2xl"
+            >
+              VOLVER AL INICIO
+            </button>
+          </div>
+        )}
+      </main>
     </div>
   );
-}
-
-function ActiveGames({ onJoin }) {
-    const [games, setGames] = useState([]);
-    useEffect(() => {
-        const fetchGames = async () => {
-            const { data } = await supabase.from('games').select('*').eq('status', 'waiting').order('created_at', { ascending: false });
-            setGames(data || []);
-        };
-        fetchGames();
-        const sub = supabase.channel('lobby').on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, fetchGames).subscribe();
-        return () => supabase.removeChannel(sub);
-    }, []);
-
-    return games.map(g => (
-        <button key={g.id} onClick={() => onJoin(g.id)} className="glass p-4 rounded-xl flex justify-between items-center hover:bg-white/20 transition-all text-left">
-            <div>
-                <div className="font-bold">Mesa {g.id.slice(0,4)}</div>
-                <div className="text-xs opacity-50">En espera...</div>
-            </div>
-            <LogIn className="text-game-accent" />
-        </button>
-    ));
 }
