@@ -39,6 +39,20 @@ export default function Auth() {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError('Introduce tu email para restablecer la contraseña');
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin
+    });
+    if (error) setError(error.message);
+    else setMessage('Se ha enviado un correo para restablecer tu contraseña');
+    setLoading(false);
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 py-8">
       <motion.div 
@@ -79,9 +93,21 @@ export default function Auth() {
               className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-red-300/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all text-lg"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
+              required={!isSignUp}
             />
           </div>
+
+          {!isSignUp && (
+            <div className="text-right">
+              <button 
+                type="button"
+                onClick={handleResetPassword}
+                className="text-[10px] uppercase font-black text-red-400 hover:text-white transition-colors tracking-widest"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          )}
 
           <AnimatePresence mode="wait">
             {error && (

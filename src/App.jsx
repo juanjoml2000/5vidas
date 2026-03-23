@@ -235,7 +235,7 @@ export default function App() {
               {/* Profile Card */}
               <div className="relative bg-white/5 border border-white/10 p-8 rounded-[3rem] overflow-hidden group">
                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><User className="w-24 h-24" /></div>
-                   <h2 className="text-xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2">Tu Perfil <span className="text-[10px] text-slate-500 italic lowercase">v2.7</span></h2>
+                   <h2 className="text-xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2">Tu Perfil <span className="text-[10px] text-slate-500 italic lowercase">v2.9</span></h2>
                    <div className="space-y-4 relative z-10">
                       <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nickname Público</label>
@@ -313,15 +313,40 @@ export default function App() {
 
             <div className="relative min-h-[45vh] bg-slate-900/50 rounded-[3.5rem] border border-white/5 flex items-center justify-center p-8 overflow-hidden">
                <div className="flex flex-wrap justify-center gap-4 relative z-10">
-                 <AnimatePresence>
-                   {trickCards.map(t => (
-                     <motion.div key={t.id} initial={{ scale: 0, y: 50 }} animate={{ scale: 1, y: 0 }} className="relative">
-                        <Card card={t} disabled />
-                        <div className="absolute -top-3 -right-3 bg-red-600 px-3 py-1 rounded-xl text-[10px] font-black shadow-xl uppercase">{t.player?.name}</div>
-                     </motion.div>
-                   ))}
-                 </AnimatePresence>
-                 {trickCards.length === 0 && (game.status === 'playing' || game.status === 'bidding') && <div className="text-white/5 font-black text-8xl italic select-none">TABLERO</div>}
+                <AnimatePresence>
+                  {trickCards.map(t => (
+                    <motion.div key={t.id} initial={{ scale: 0, y: 50 }} animate={{ scale: 1, y: 0 }} className="relative">
+                       <Card card={t} disabled />
+                       <div className="absolute -top-3 -right-3 bg-red-600 px-3 py-1 rounded-xl text-[10px] font-black shadow-xl uppercase">{t.player?.name}</div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                {trickCards.length === 0 && (game.status === 'playing' || game.status === 'bidding') && <div className="text-white/5 font-black text-8xl italic select-none">TABLERO</div>}
+                
+                {view === 'bidding' && isMyTurn && (
+                  <motion.div 
+                    initial={{ scale: 0.8, opacity: 0 }} 
+                    animate={{ scale: 1, opacity: 1 }} 
+                    className="absolute inset-0 z-40 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 rounded-[3.5rem]"
+                  >
+                     <div className="bg-slate-900 border border-white/20 rounded-[2.5rem] p-8 shadow-2xl w-full max-w-lg">
+                        <h3 className="text-center text-xl font-black mb-6 italic tracking-tighter uppercase">¿CUÁNTAS BAZAS TE LLEVAS?</h3>
+                        <div className="flex flex-wrap justify-center gap-2">
+                           {[...Array(game.current_round + 1)].map((_, i) => (
+                             <button 
+                               key={i} 
+                               onClick={() => placeBid(i)} 
+                               disabled={loading || me?.current_bid !== null} 
+                               className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl border-2 font-black text-lg transition-all ${me?.current_bid === i ? 'bg-red-600 border-red-400 scale-110 shadow-lg' : 'bg-white/5 border-white/20 hover:bg-white/10'}`}
+                             >
+                               {i}
+                             </button>
+                           ))}
+                        </div>
+                        {me?.current_bid !== null && <p className="text-center mt-6 text-amber-500 font-bold animate-pulse text-sm">Esperando al resto...</p>}
+                     </div>
+                  </motion.div>
+                )}
                </div>
                {isMyTurn && view === 'playing' && everyoneBid && <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity }} className="absolute bottom-6 left-1/2 -translate-x-1/2 px-8 py-3 bg-amber-500 text-black font-black text-sm tracking-widest rounded-full shadow-2xl">TU TURNO</motion.div>}
             </div>
@@ -334,20 +359,6 @@ export default function App() {
                           {myCards.map(c => <Card key={c.id} card={c} onClick={() => isMyTurn && everyoneBid && view === 'playing' && playCard(c.id)} disabled={!isMyTurn || !everyoneBid || view !== 'playing'} />)}
                        </div>
                     </div>
-
-                    {view === 'bidding' && (
-                      <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl w-full max-w-2xl">
-                         <h3 className="text-center text-2xl font-black mb-6 italic tracking-tighter">¿CUÁNTAS BAZAS TE LLEVAS?</h3>
-                         <div className="flex flex-wrap justify-center gap-3">
-                            {[...Array(game.current_round + 1)].map((_, i) => (
-                              <button key={i} onClick={() => placeBid(i)} disabled={loading || me?.current_bid !== null} className={`w-14 h-14 md:w-16 md:h-16 rounded-2xl border-4 font-black text-xl transition-all ${me?.current_bid === i ? 'bg-red-600 border-red-400 scale-110 shadow-lg' : 'bg-white/5 border-white/10 opacity-60 hover:opacity-100'}`}>
-                                {i}
-                              </button>
-                            ))}
-                         </div>
-                         {me?.current_bid !== null && !everyoneBid && <p className="text-center mt-6 text-amber-500 font-bold animate-pulse text-sm">Esperando al resto...</p>}
-                      </motion.div>
-                    )}
                  </div>
                )}
 

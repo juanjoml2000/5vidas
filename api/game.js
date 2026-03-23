@@ -93,7 +93,13 @@ async function startRound(supabase, game_id) {
 
   await supabase.from('cards').delete().eq('game_id', game_id)
   await supabase.from('cards').insert(dealtCards)
-  await supabase.from('games').update({ status: 'bidding', turn_index: 0 }).eq('id', game_id)
+  
+  const startIndex = Math.floor(Math.random() * players.length)
+  await supabase.from('games').update({ 
+    status: 'bidding', 
+    turn_index: startIndex 
+  }).eq('id', game_id)
+  
   await supabase.from('players').update({ current_bid: null, tricks_won: 0 }).eq('game_id', game_id)
 }
 
@@ -105,23 +111,35 @@ async function placeBid(supabase, game_id, player_id, bid) {
 
     const currentIndex = players.findIndex(p => p.id === player_id)
 
-    if (currentIndex === players.length - 1) {
+    const numBids = players.filter(p => p.current_bid !== null).length
+    const isLastBidder = numBids === players.length - 1
+
+    if (isLastBidder) {
         const totalOtherBids = players.reduce((sum, p) => p.id !== player_id ? sum + (p.current_bid || 0) : sum, 0)
         if (totalOtherBids + bid === game.current_round) {
           if (players[currentIndex].name.startsWith('Bot')) {
             bid = (bid === 0) ? 1 : bid - 1
           } else {
-            throw new Error(`Invalid bid: total bids cannot equal ${game.current_round}`)
+            throw new Error(`¡Regla del último! La suma no puede ser ${game.current_round}`)
           }
         }
     }
 
     await supabase.from('players').update({ current_bid: bid }).eq('id', player_id)
 
-    if (currentIndex === players.length - 1) {
-        await supabase.from('games').update({ status: 'playing', turn_index: 0 }).eq('id', game_id)
+    await supabase.from('players').update({ current_bid: bid }).eq('id', player_id)
+
+    const nextIndex = (currentIndex + 1) % players.length
+    if (numBids + 1 === players.length) {
+        // All have bid, start playing from the same person who started bidding
+        // The current turn_index was the starter of bidding when status was updated to 'bidding'
+        // But we need to find who was the FIRST to bid this round. 
+        // We can find it by checking who HAS current_bid but is NOT the nextIndex? No.
+        // Let's just keep the turn_index moving circularly. The person who started bidding
+        // will be the one whose turn it is after the last person bids.
+        await supabase.from('games').update({ status: 'playing', turn_index: nextIndex }).eq('id', game_id)
     } else {
-        await supabase.from('games').update({ turn_index: currentIndex + 1 }).eq('id', game_id)
+        await supabase.from('games').update({ turn_index: nextIndex }).eq('id', game_id)
     }
 }
 
