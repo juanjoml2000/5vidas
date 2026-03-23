@@ -282,7 +282,7 @@ export default function App() {
     const { error } = await supabase.from('messages').insert({
       game_id: gId,
       player_id: me?.id || null,
-      name: profile?.nickname || session.user.user_metadata?.display_name || 'Anónimo',
+      name: me?.name || profile?.nickname || session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'Anónimo',
       content: chatInput.trim()
     });
     if (error) {
