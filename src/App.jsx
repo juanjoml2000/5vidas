@@ -47,13 +47,30 @@ export default function App() {
       setMyCards(hand || []);
     }
 
-    // 4. Fetch Table Cards (Current Trick)
-    const { data: table } = await supabase.from('cards')
+    // 4. Fetch Table Cards (Current Trick OR Last Trick if current trick just finished)
+    let { data: table } = await supabase.from('cards')
       .select('*, player:players(name)')
       .eq('game_id', gameId)
       .eq('is_played', true)
       .is('trick_id', null)
       .order('played_at');
+
+    if (!table || table.length === 0) {
+      const { data: lastTrick } = await supabase.from('tricks')
+        .select('id')
+        .eq('game_id', gameId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (lastTrick) {
+        const { data: lastCards } = await supabase.from('cards')
+          .select('*, player:players(name)')
+          .eq('trick_id', lastTrick.id)
+          .order('played_at');
+        table = lastCards;
+      }
+    }
     setTrickCards(table || []);
   }, []);
 
