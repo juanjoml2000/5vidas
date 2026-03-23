@@ -123,12 +123,14 @@ export default function App() {
       const now = new Date();
       const activeWaiting = (data || []).filter(g => {
          const alivePlayers = (g.players || []).filter(p => {
-            if (p.name.startsWith('Bot')) return true; // Bots are always alive
-            const pingDate = new Date(p.last_ping || 0);
-            return (now - pingDate) < 60000; // Alive if pinged in last 60s
+            if (!p.last_ping) return p.name.startsWith('Bot'); // Bots need ping too unless they just arrived
+            const pingDate = new Date(p.last_ping);
+            return Math.abs(now - pingDate) < 60000; // Alive if pinged in last 60s (with drift protection)
          });
+         
+         const hasHuman = alivePlayers.some(p => !p.name.startsWith('Bot'));
          g.activeCount = alivePlayers.length;
-         return alivePlayers.length > 0;
+         return hasHuman; // ROOM IS ONLY ALIVE IF A HUMAN IS PINGING
       });
 
       setWaitingGames(activeWaiting);
@@ -315,7 +317,7 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-black italic uppercase tracking-tighter">Mesas Disponibles</h2>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-slate-500 italic">v2.2</span>
+                    <span className="text-[10px] font-black text-slate-500 italic">v2.3</span>
                     <Users className="text-red-500" />
                   </div>
                 </div>
