@@ -39,7 +39,6 @@ export default function App() {
       .eq('game_id', gameId)
       .order('created_at', { ascending: true });
     
-    // Fallback to ID sorting if created_at is missing for some rows
     const sortedPData = (pData || []).sort((a,b) => {
       if (a.created_at && b.created_at) return new Date(a.created_at) - new Date(b.created_at);
       return a.id.localeCompare(b.id);
@@ -57,7 +56,7 @@ export default function App() {
       setMyCards(hand || []);
     }
 
-    // 4. Fetch Table Cards (Current Trick OR Last Trick if current trick just finished)
+    // 4. Fetch Table Cards
     let { data: table } = await supabase.from('cards')
       .select('*, player:players(name)')
       .eq('game_id', gameId)
@@ -96,36 +95,57 @@ export default function App() {
       .subscribe();
 
     fetchGameState(game.id, session.user.id);
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [game?.id, session?.user?.id, fetchGameState]);
+
+  // Presence Heartbeat
+  useEffect(() => {
+    const me = players.find(p => p.user_id === session?.user?.id);
+    if (!game || !me) return;
+
+    const ping = async () => {
+      await supabase.from('players').update({ last_ping: new Date() }).eq('id', me.id);
+    };
+
+    const interval = setInterval(ping, 20000); // Pulse every 20s
+    ping(); // Initial ping
+    return () => clearInterval(interval);
+  }, [game?.id, players.length, session?.user?.id]);
 
   // Sync Lobby Games
   useEffect(() => {
     if (!session?.user?.id) return;
 
     const fetchWaitingGames = async () => {
-      const { data, error } = await supabase.from('games').select('*, players(count)').eq('status', 'waiting');
-      if (error) { console.error("Lobby Fetch Error:", error); return; }
+      // Fetch games with their players' ping info
+      const { data } = await supabase.from('games').select('*, players(name, last_ping)').eq('status', 'waiting');
       
-      // FILTER GHOST ROOMS: Strict check to only show games with > 0 players
+      const now = new Date();
       const activeWaiting = (data || []).filter(g => {
-        const count = g.players?.[0]?.count || 0;
-        return count > 0;
+         const alivePlayers = (g.players || []).filter(p => {
+            if (p.name.startsWith('Bot')) return true; // Bots are always alive
+            const pingDate = new Date(p.last_ping || 0);
+            return (now - pingDate) < 60000; // Alive if pinged in last 60s
+         });
+         g.activeCount = alivePlayers.length;
+         return alivePlayers.length > 0;
       });
+
       setWaitingGames(activeWaiting);
     };
 
     const lobbyChannel = supabase
       .channel('lobby_sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: 'status=eq.waiting' }, fetchWaitingGames)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, fetchWaitingGames)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchWaitingGames)
       .subscribe();
 
     fetchWaitingGames();
-    return () => { supabase.removeChannel(lobbyChannel); };
+    const refreshInterval = setInterval(fetchWaitingGames, 30000); // Periodic clean check
+    return () => { 
+      supabase.removeChannel(lobbyChannel); 
+      clearInterval(refreshInterval);
+    };
   }, [session?.user?.id]);
 
   useEffect(() => {
@@ -138,7 +158,7 @@ export default function App() {
   const createGame = async () => {
     if (!session?.user) return;
     const name = window.prompt('¿Qué nombre quieres para la sala?', 'Mesa de ' + session.user.email.split('@')[0]);
-    if (name === null) return; // Cancelled
+    if (name === null) return;
     
     setLoading(true);
     try {
@@ -163,8 +183,11 @@ export default function App() {
           game_id: gameId, 
           name: session.user.email.split('@')[0], 
           lives: 5,
-          created_at: new Date()
+          created_at: new Date(),
+          last_ping: new Date()
         });
+      } else {
+        await supabase.from('players').update({ last_ping: new Date() }).eq('id', existingPlayer.id);
       }
       fetchGameState(gameId, session.user.id);
     } catch (err) { alert(err.message); } finally { setLoading(false); }
@@ -174,8 +197,8 @@ export default function App() {
   if (!session?.user) return <Auth />;
 
   const me = (players || []).find(p => p.user_id === session.user.id);
-  const isHost = game?.host_id === session.user.id; // Stable host check
-  const sortedPlayers = [...(players || [])]; // Already sorted by created_at in fetchGameState
+  const isHost = game?.host_id === session.user.id;
+  const sortedPlayers = [...(players || [])];
   const currentPlayer = sortedPlayers[game?.turn_index || 0];
   const isMyTurn = currentPlayer?.id === me?.id;
   const everyoneBid = players.length > 0 && players.every(p => p.current_bid !== null);
@@ -218,7 +241,7 @@ export default function App() {
           <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-red-900/40">
             <span className="text-xl font-black italic">5</span>
           </div>
-          <span className="text-xl font-black tracking-tighter uppercase sm:block">5 VIDAS</span>
+          <span className="text-xl font-black tracking-tighter uppercase">5 VIDAS</span>
         </div>
         <div className="flex items-center gap-2">
           {game && (
@@ -281,7 +304,7 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-black italic uppercase tracking-tighter">Mesas Disponibles</h2>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-slate-500 italic">v2.1</span>
+                    <span className="text-[10px] font-black text-slate-500 italic">v2.2</span>
                     <Users className="text-red-500" />
                   </div>
                 </div>
@@ -298,7 +321,7 @@ export default function App() {
                       >
                         <div className="text-left">
                            <p className="font-black text-lg text-slate-200 line-clamp-1">{g.name || 'Mesa Sin Nombre'}</p>
-                           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{g.players?.[0]?.count || 0} / 4 Jugadores</p>
+                           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{g.activeCount || 0} / 4 Jugadores</p>
                         </div>
                         <div className="p-3 bg-red-600/10 text-red-500 rounded-2xl group-hover:bg-red-600 group-hover:text-white transition-all">
                           <Plus className="w-5 h-5 text-current" />

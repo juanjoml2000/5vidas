@@ -30,6 +30,10 @@ export default async function handler(req, res) {
       case 'add-bot':
         await addBot(supabase, game_id)
         return res.status(200).json({ success: true })
+      case 'heartbeat':
+         // NEW: Direct heartbeat via API to ensure service role can bypass some RLS if needed
+         await supabase.from('players').update({ last_ping: new Date() }).eq('id', player_id)
+         return res.status(200).json({ success: true })
       default:
         return res.status(400).json({ error: 'Invalid action' })
     }
@@ -183,7 +187,8 @@ async function addBot(supabase, game_id) {
         user_id: botId,
         name: `Bot ${players.length + 1}`,
         lives: 5,
-        created_at: new Date()
+        created_at: new Date(),
+        last_ping: new Date() // Bots are always "pinging"
     });
 }
 

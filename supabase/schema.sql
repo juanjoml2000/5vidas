@@ -28,6 +28,7 @@ CREATE TABLE players (
   order_index INTEGER, -- Turn order
   is_ready BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_ping TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(game_id, order_index)
 );
 
