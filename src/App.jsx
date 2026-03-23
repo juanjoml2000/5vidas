@@ -63,13 +63,13 @@ export default function App() {
     if (game?.status === 'bidding') setView('bidding');
     else if (game?.status === 'playing') setView('playing');
     else if (game?.status === 'ended') setView('ended');
-    else if (game?.status === 'lobby') setView('lobby');
+    else if (game?.status === 'waiting') setView('lobby');
   }, [game?.status]);
 
   const createGame = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('games').insert({ status: 'lobby' }).select().single();
+      const { data, error } = await supabase.from('games').insert({ status: 'waiting' }).select().single();
       if (error) throw error;
       joinGame(data.id);
     } catch (err) {
