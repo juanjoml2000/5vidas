@@ -23,8 +23,12 @@ export default function App() {
       setSession(session);
       if (session) fetchProfile(session.user.id, session.user.email);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
+      if (event === 'PASSWORD_RECOVERY') {
+        setView('auth');
+      }
       if (session) fetchProfile(session.user.id, session.user.email);
     });
     return () => subscription.unsubscribe();
@@ -170,7 +174,7 @@ export default function App() {
   };
 
   const logout = async () => { await supabase.auth.signOut(); };
-  if (!session?.user) return <Auth />;
+  if (!session?.user || view === 'auth') return <Auth />;
 
   const me = (players || []).find(p => p.user_id === session.user.id);
   const isHost = game?.host_id === session.user.id;

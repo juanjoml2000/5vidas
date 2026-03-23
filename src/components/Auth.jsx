@@ -10,6 +10,13 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
+  const [isUpdatePassword, setIsUpdatePassword] = useState(false);
+
+  React.useEffect(() => {
+    supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setIsUpdatePassword(true);
+    });
+  }, []);
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -53,6 +60,22 @@ export default function Auth() {
     setLoading(false);
   };
 
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (!password) {
+        setError('Introduce una nueva contraseña');
+        return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) setError(error.message);
+    else {
+        setMessage('¡Contraseña actualizada! Ya puedes jugar.');
+        setTimeout(() => setIsUpdatePassword(false), 2000);
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 py-8">
       <motion.div 
@@ -68,36 +91,38 @@ export default function Auth() {
           </div>
           <h1 className="text-3xl font-black text-white tracking-tighter uppercase mb-2">5 VIDAS</h1>
           <p className="text-red-200 font-medium">
-            {isSignUp ? 'Crea tu cuenta para jugar' : 'Inicia sesión para entrar al juego'}
+            {isUpdatePassword ? 'Establece tu nueva contraseña' : isSignUp ? 'Crea tu cuenta para jugar' : 'Inicia sesión para entrar al juego'}
           </p>
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-4">
-          <div className="relative group">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-red-300 group-focus-within:text-white transition-colors" />
-            <input
-              type="email"
-              placeholder="Email"
-              className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-red-300/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all text-lg"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
+        <form onSubmit={isUpdatePassword ? handleUpdatePassword : handleAuth} className="space-y-4">
+          {!isUpdatePassword && (
+            <div className="relative group">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-red-300 group-focus-within:text-white transition-colors" />
+              <input
+                type="email"
+                placeholder="Email"
+                className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-red-300/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all text-lg"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+          )}
 
           <div className="relative group">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-red-300 group-focus-within:text-white transition-colors" />
             <input
               type="password"
-              placeholder="Contraseña"
+              placeholder={isUpdatePassword ? "Nueva Contraseña" : "Contraseña"}
               className="w-full bg-black/20 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-red-300/50 focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all text-lg"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required={!isSignUp}
+              required={!isSignUp || isUpdatePassword}
             />
           </div>
 
-          {!isSignUp && (
+          {!isSignUp && !isUpdatePassword && (
             <div className="text-right">
               <button 
                 type="button"
@@ -139,6 +164,11 @@ export default function Auth() {
           >
             {loading ? (
               <Loader2 className="w-6 h-6 animate-spin" />
+            ) : isUpdatePassword ? (
+               <>
+                 <Save className="w-6 h-6" />
+                 Guardar Contraseña
+               </>
             ) : isSignUp ? (
               <>
                 <UserPlus className="w-6 h-6" />
@@ -153,21 +183,23 @@ export default function Auth() {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-white/10 text-center">
-          <p className="text-red-200/70 mb-2">
-            {isSignUp ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?'}
-          </p>
-          <button
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setError(null);
-              setMessage(null);
-            }}
-            className="text-white font-bold hover:text-red-300 transition-colors text-lg underline underline-offset-4 decoration-red-500/50"
-          >
-            {isSignUp ? 'Inicia Sesión' : 'Crea una cuenta ahora'}
-          </button>
-        </div>
+        {!isUpdatePassword && (
+          <div className="mt-8 pt-6 border-t border-white/10 text-center">
+            <p className="text-red-200/70 mb-2">
+              {isSignUp ? '¿Ya tienes cuenta?' : '¿No tienes cuenta?'}
+            </p>
+            <button
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setError(null);
+                setMessage(null);
+              }}
+              className="text-white font-bold hover:text-red-300 transition-colors text-lg underline underline-offset-4 decoration-red-500/50"
+            >
+              {isSignUp ? 'Inicia Sesión' : 'Crea una cuenta ahora'}
+            </button>
+          </div>
+        )}
       </motion.div>
       
       <p className="mt-8 text-red-200/50 text-sm font-medium flex flex-col items-center gap-1">
