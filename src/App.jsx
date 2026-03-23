@@ -152,6 +152,20 @@ export default function App() {
     });
   };
 
+  const addBot = async () => {
+    if (!game?.id) return;
+    await fetch('/api/game', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'add-bot', game_id: game.id })
+    });
+  };
+
+  const backToLobby = () => {
+    setGame(null);
+    setView('lobby');
+  };
+
   const leaveGame = async () => {
     if (!me) return;
     if (confirm('¿Seguro que quieres abandonar la partida? Perderás tu progreso.')) {
@@ -404,13 +418,31 @@ export default function App() {
                 </div>
               )}
 
-              {view === 'lobby' && players?.length >= 2 && isHost && (
-                <div className="flex justify-center pt-8">
+              {view === 'lobby' && (
+                <div className="flex flex-col sm:flex-row justify-center gap-4 pt-8">
+                  {isHost && players?.length < 4 && (
+                    <button
+                      onClick={addBot}
+                      className="bg-red-600/20 hover:bg-red-600/30 text-red-400 px-8 py-5 rounded-3xl font-black text-xl border border-red-500/20 transition-all active:scale-95 flex items-center justify-center gap-3"
+                    >
+                      <Plus className="w-8 h-8" /> AÑADIR BOT
+                    </button>
+                  )}
+                  
+                  {isHost && players?.length >= 2 && (
+                    <button
+                      onClick={startGame}
+                      className="bg-green-600 hover:bg-green-500 px-12 py-5 rounded-3xl font-black text-xl shadow-xl shadow-green-900/40 transition-all active:scale-95 flex items-center justify-center gap-3"
+                    >
+                      <Play className="w-8 h-8 fill-current" /> COMENZAR
+                    </button>
+                  )}
+
                   <button
-                    onClick={startGame}
-                    className="bg-green-600 hover:bg-green-500 px-12 py-5 rounded-3xl font-black text-xl shadow-xl shadow-green-900/40 transition-all active:scale-95 flex items-center gap-3"
+                    onClick={backToLobby}
+                    className="bg-white/5 hover:bg-white/10 text-white px-8 py-5 rounded-3xl font-black text-xl border border-white/10 transition-all active:scale-95 flex items-center justify-center gap-3"
                   >
-                    <Play className="w-8 h-8 fill-current" /> COMENZAR PARTIDA
+                    VOLVER AL MENÚ
                   </button>
                 </div>
               )}

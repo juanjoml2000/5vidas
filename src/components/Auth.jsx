@@ -144,8 +144,9 @@ export default function Auth() {
         </div>
       </motion.div>
       
-      <p className="mt-8 text-red-200/50 text-sm font-medium">
-        © 2024 5 VIDAS - Juego de Cartas
+      <p className="mt-8 text-red-200/50 text-sm font-medium flex flex-col items-center gap-1">
+        <span>© 2024 5 VIDAS - Juego de Cartas</span>
+        <span className="text-red-500/80 font-black tracking-widest uppercase text-[10px]">Creado por Juanjo_xrd</span>
       </p>
     </div>
   );
