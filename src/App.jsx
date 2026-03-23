@@ -216,7 +216,7 @@ export default function App() {
   if (!session?.user || view === 'auth') return <Auth />;
 
   const me = (players || []).find(p => p.user_id === session.user.id);
-  const isHost = game?.host_id === session.user.id;
+  const isHost = session?.user?.id === game?.host_id;
   const isMyTurn = players[game?.turn_index || 0]?.id === me?.id;
   const everyoneBid = players.length > 0 && players.every(p => p.current_bid !== null);
 
@@ -269,8 +269,15 @@ export default function App() {
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed inset-y-0 right-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[60] border-l border-white/10 p-8 shadow-2xl shadow-black">
              <div className="flex items-center justify-between mb-12"><h2 className="text-2xl font-black italic uppercase tracking-tighter">OPCIONES</h2><button onClick={() => setIsMenuOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button></div>
               <div className="space-y-6">
-                  {game.status === 'waiting' && me.id === game.host_id && (
-                    <button onClick={() => { setIsMenuOpen(false); addBot(); }} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest text-blue-400"><Bot className="w-5 h-5" /> AÑADIR BOT</button>
+                  {isHost && (
+                    <button 
+                      disabled={game.status !== 'waiting'} 
+                      onClick={() => { setIsMenuOpen(false); addBot(); }} 
+                      className={`w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex flex-col items-center justify-center gap-1 active:scale-95 uppercase tracking-widest ${game.status === 'waiting' ? 'text-blue-400' : 'text-slate-600 opacity-50'}`}
+                    >
+                      <div className="flex items-center gap-3"><Bot className="w-5 h-5" /> AÑADIR BOT</div>
+                      {game.status !== 'waiting' && <span className="text-[8px] lowercase italic opacity-50">(Solo en Lobby)</span>}
+                    </button>
                   )}
                   <button onClick={() => { setIsMenuOpen(false); copyInvite(); }} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest text-emerald-400"><Plus className="w-5 h-5" /> INVITAR AMIGOS</button>
                   <button onClick={() => { setIsMenuOpen(false); setShowRules(true); }} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Info className="w-5 h-5 text-red-500" /> REGLAS DEL JUEGO</button>
