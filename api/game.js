@@ -36,8 +36,17 @@ export default async function handler(req, res) {
       case 'kick-player': {
          const { data: g } = await supabase.from('games').select('host_id').eq('id', game_id).single();
          const { data: p } = await supabase.from('players').select('user_id').eq('id', player_id).single();
-         if (!g || !p || g.host_id !== p.user_id) return res.status(403).json({ error: 'No autorizado' });
-         await supabase.from('players').delete().eq('id', data.target_id);
+         
+         if (!g) return res.status(404).json({ error: 'Mesa no encontrada' });
+         if (!p) return res.status(404).json({ error: 'Sesión de host inválida' });
+         
+         if (g.host_id !== p.user_id) {
+            return res.status(403).json({ error: 'No autorizado: Solo el anfitrión puede expulsar' });
+         }
+         
+         const { error: delError } = await supabase.from('players').delete().eq('id', data.target_id);
+         if (delError) return res.status(500).json({ error: delError.message });
+         
          return res.status(200).json({ success: true })
       }
       case 'get-other-cards':

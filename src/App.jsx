@@ -243,13 +243,18 @@ export default function App() {
 
   const kickPlayer = async (targetId) => {
     if (!confirm('¿Expulsar a este jugador de la mesa?')) return;
-    const { status } = await fetch('/api/game', { 
-      method: 'POST', 
-      headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ action: 'kick-player', game_id: game.id, player_id: me.id, data: { target_id: targetId } }) 
-    });
-    if (status === 200) {
+    try {
+      const resp = await fetch('/api/game', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ action: 'kick-player', game_id: game.id, player_id: me.id, data: { target_id: targetId } }) 
+      });
+      const resData = await resp.json();
+      if (!resp.ok) throw new Error(resData.error || 'Error al expulsar');
       alert('Jugador expulsado');
+    } catch (err) {
+      console.error(err);
+      alert('Error: ' + err.message);
     }
   };
 
