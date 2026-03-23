@@ -321,10 +321,10 @@ export default function App() {
             <>
               <button 
                 onClick={() => setIsChatOpen(!isChatOpen)} 
-                className={`p-2 hover:bg-white/10 rounded-xl transition-colors relative ${messages.length > 0 ? 'text-red-500' : 'text-slate-400'}`}
+                className="p-2 hover:bg-white/10 rounded-xl transition-colors relative text-red-500"
               >
                 <MessageSquare className="w-6 h-6" />
-                {messages.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-black" />}
+                {messages.length > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-400 rounded-full border-2 border-black animate-pulse" />}
               </button>
               <button onClick={copyInvite} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-emerald-500"><Share2 className="w-6 h-6" /></button>
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">{isMenuOpen ? <X /> : <Menu />}</button>
