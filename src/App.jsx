@@ -18,6 +18,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [otherCards, setOtherCards] = useState([]);
 
   useEffect(() => {
     // Check for recovery hash directly on mount in case event fires too soon
@@ -142,6 +143,23 @@ export default function App() {
   }, [session?.user?.id]);
 
   useEffect(() => {
+    if (game?.current_round === 1 && (game.status === 'bidding' || game.status === 'playing')) {
+      const fetchOthers = async () => {
+        try {
+          const res = await fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'get-other-cards', game_id: game.id, player_id: session.user.id }) });
+          const d = await res.json();
+          setOtherCards(d.cards || []);
+        } catch(e) {}
+      }
+      fetchOthers();
+      const interval = setInterval(fetchOthers, 3000);
+      return () => clearInterval(interval);
+    } else {
+      setOtherCards([]);
+    }
+  }, [game?.id, game?.current_round, game?.status]);
+
+  useEffect(() => {
     if (game?.status === 'bidding') setView('bidding');
     else if (game?.status === 'playing') setView('playing');
     else if (game?.status === 'ended') setView('ended');
@@ -216,7 +234,7 @@ export default function App() {
           <span className="text-xl font-black tracking-tighter uppercase">5 VIDAS</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowRules(true)} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-red-500"><Info className="w-6 h-6" /></button>
+          {!game && <button onClick={() => setShowRules(true)} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-red-500"><Info className="w-6 h-6" /></button>}
           {game && <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">{isMenuOpen ? <X /> : <Menu />}</button>}
           <div className="h-8 w-px bg-white/10 mx-2" />
           <button onClick={logout} className="flex items-center gap-2 px-4 py-2 text-red-400 font-bold rounded-xl active:scale-95 transition-all"><LogOut className="w-5 h-5" /><span className="hidden sm:inline uppercase">Salir</span></button>
@@ -227,9 +245,10 @@ export default function App() {
         {isMenuOpen && (
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed inset-y-0 right-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[60] border-l border-white/10 p-8 shadow-2xl shadow-black">
              <div className="flex items-center justify-between mb-12"><h2 className="text-2xl font-black italic uppercase tracking-tighter">OPCIONES</h2><button onClick={() => setIsMenuOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button></div>
-             <div className="space-y-6">
-                <button onClick={() => { setIsMenuOpen(false); leaveGame(); }} className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-black py-6 rounded-3xl border border-red-500/20 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Zap className="w-5 h-5 fill-current" /> SALIR DE LA MESA</button>
-             </div>
+              <div className="space-y-6">
+                 <button onClick={() => { setIsMenuOpen(false); setShowRules(true); }} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Info className="w-5 h-5 text-red-500" /> REGLAS DEL JUEGO</button>
+                 <button onClick={() => { setIsMenuOpen(false); leaveGame(); }} className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-black py-4 rounded-2xl border border-red-500/20 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Zap className="w-5 h-5 fill-current" /> SALIR DE LA MESA</button>
+              </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -239,14 +258,14 @@ export default function App() {
           <div className="py-8 flex flex-col items-center gap-12">
             <div className="text-center">
               <h1 className="text-7xl md:text-9xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40 mb-2 tracking-tighter">5 VIDAS</h1>
-              <p className="text-red-500 font-black tracking-[0.5em] text-sm md:text-base uppercase underline underline-offset-8">Mesa de Juego</p>
+              <p className="text-red-500 font-black tracking-[0.5em] text-sm md:text-base uppercase underline underline-offset-8">JUEGO DE MESA</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-5xl">
               {/* Profile Card */}
               <div className="relative bg-white/5 border border-white/10 p-8 rounded-[3rem] overflow-hidden group">
                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><User className="w-24 h-24" /></div>
-                   <h2 className="text-xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2">Tu Perfil <span className="text-[10px] text-slate-500 italic lowercase">v3.1</span></h2>
+                   <h2 className="text-xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2">Tu Perfil <span className="text-[10px] text-slate-500 italic lowercase">v3.5</span></h2>
                    <div className="space-y-4 relative z-10">
                       <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nickname Público</label>
@@ -309,13 +328,20 @@ export default function App() {
               <div className="flex items-center gap-2">
                 {players.map(p => (
                   <div key={p.id} className={`p-2 rounded-2xl border transition-all ${players[game.turn_index]?.id === p.id ? 'bg-red-600 border-red-400 scale-110' : 'bg-white/5 border-white/10 shadow-lg'}`}>
-                    <div className="flex flex-col items-center gap-1">
+                    <div className="flex flex-col items-center gap-1 relative">
                        <span className="text-[10px] font-black uppercase opacity-60">{p.user_id === session.user.id ? 'TÚ' : p.name.substring(0,8)}</span>
                        <div className="flex items-center gap-1 text-xs font-black">
                           <Heart className={`w-3 h-3 ${players[game.turn_index]?.id === p.id ? 'fill-white' : 'fill-red-500'}`} />
                           <span className={players[game.turn_index]?.id === p.id ? 'text-white' : 'text-slate-300'}>{p.lives}</span>
                        </div>
                        {p.current_bid !== null && <span className="text-[10px] font-black mt-1 bg-black/30 px-2 rounded-full">{p.tricks_won}/{p.current_bid}</span>}
+                       {game.current_round === 1 && p.user_id !== session.user.id && (
+                         <div className="mt-2 scale-50 -translate-y-2">
+                           {otherCards.find(c => c.player_id === p.id) && (
+                             <Card card={otherCards.find(c => c.player_id === p.id)} disabled />
+                           )}
+                         </div>
+                       )}
                     </div>
                   </div>
                 ))}
@@ -367,7 +393,16 @@ export default function App() {
                  <div className="flex flex-col items-center gap-8">
                     <div className="flex flex-col items-center gap-4 w-full">
                        <div className="flex flex-wrap justify-center gap-3 p-4 w-full">
-                          {myCards.map(c => <Card key={c.id} card={c} onClick={() => isMyTurn && everyoneBid && view === 'playing' && playCard(c.id)} disabled={!isMyTurn || !everyoneBid || view !== 'playing'} />)}
+                          {myCards.map(c => (
+                            <Card 
+                              key={c.id} 
+                              card={c} 
+                              hidden={game.current_round === 1 && game.status !== 'ended'} // Blind Mode
+                              onClick={() => playCard(c.id)} 
+                              disabled={loading || !isMyTurn || game.status !== 'playing'} 
+                              isPlayable={isMyTurn && game.status === 'playing'}
+                            />
+                          ))}
                        </div>
                     </div>
                  </div>
@@ -460,6 +495,16 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+      <footer className="relative z-10 py-12 flex flex-col items-center gap-6">
+        <div className="flex items-center gap-4 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all">
+          <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center font-black">5</div>
+          <span className="text-sm font-black tracking-widest uppercase italic">v3.5 Final Master Edition</span>
+        </div>
+        <p className="text-slate-500 text-[10px] font-black tracking-widest uppercase flex flex-col items-center gap-2">
+          <span>© 2026 5 VIDAS - Juego de Cartas</span>
+          <span className="text-red-600">Creado por Juanjo_xrd</span>
+        </p>
+      </footer>
     </div>
   );
 }

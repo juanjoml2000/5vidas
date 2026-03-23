@@ -33,6 +33,9 @@ export default async function handler(req, res) {
       case 'heartbeat':
          await supabase.from('players').update({ last_ping: new Date() }).eq('id', player_id)
          return res.status(200).json({ success: true })
+      case 'get-other-cards':
+         const { data: others } = await supabase.from('cards').select('*, player:players(name)').eq('game_id', game_id).neq('player_id', player_id)
+         return res.status(200).json({ cards: others })
       case 'cleanup':
          const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
          // 1. Delete dead players
@@ -114,7 +117,7 @@ async function placeBid(supabase, game_id, player_id, bid) {
     const numBids = players.filter(p => p.current_bid !== null).length
     const isLastBidder = numBids === players.length - 1
 
-    if (isLastBidder) {
+    if (isLastBidder && game.current_round > 1) { // Rule disabled in round 1
         const totalOtherBids = players.reduce((sum, p) => p.id !== player_id ? sum + (p.current_bid || 0) : sum, 0)
         if (totalOtherBids + bid === game.current_round) {
           if (players[currentIndex].name.startsWith('Bot')) {
@@ -195,14 +198,15 @@ async function resolveRound(supabase, game_id) {
     const updatedPlayers = await getSortedPlayers(supabase, game_id)
     const alivePlayers = updatedPlayers.filter(p => p.lives > 0)
 
-    if (alivePlayers.length <= 1 || game.current_round === 1) {
+    if (alivePlayers.length <= 1) {
         const winner = alivePlayers.length === 1 ? alivePlayers[0].id : (alivePlayers.length > 1 ? alivePlayers.sort((a,b) => b.lives - a.lives)[0].id : null);
         await supabase.from('games').update({ status: 'ended', winner_id: winner }).eq('id', game_id)
     } else {
-        // AUTOMATIC START OF NEXT ROUND
+        // Loop: If it was round 1, next is 5.
+        const nextRound = game.current_round === 1 ? 5 : (game.current_round - 1);
         await supabase.from('games').update({ 
             status: 'waiting', 
-            current_round: game.current_round - 1,
+            current_round: nextRound,
             turn_index: 0
         }).eq('id', game_id);
         
