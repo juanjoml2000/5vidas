@@ -64,7 +64,7 @@ async function getSortedPlayers(supabase, game_id) {
 
 async function startRound(supabase, game_id) {
   const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
-  const players = await getSortedPlayers(supabase, game_id)
+  const players = (await getSortedPlayers(supabase, game_id)).filter(p => p.lives > 0)
 
   if (!game || players.length < 2) {
     throw new Error('Game not found or not enough players')
@@ -99,7 +99,7 @@ async function startRound(supabase, game_id) {
 
 async function placeBid(supabase, game_id, player_id, bid) {
     const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
-    const players = await getSortedPlayers(supabase, game_id)
+    const players = (await getSortedPlayers(supabase, game_id)).filter(p => p.lives > 0);
     
     if (players[game.turn_index].id !== player_id) throw new Error('Not your turn')
 
@@ -127,7 +127,7 @@ async function placeBid(supabase, game_id, player_id, bid) {
 
 async function playCard(supabase, game_id, player_id, card_id) {
     const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
-    const players = await getSortedPlayers(supabase, game_id)
+    const players = (await getSortedPlayers(supabase, game_id)).filter(p => p.lives > 0);
     
     if (players[game.turn_index].id !== player_id) throw new Error('Not your turn')
 
@@ -181,11 +181,16 @@ async function resolveRound(supabase, game_id) {
         const winner = alivePlayers.length === 1 ? alivePlayers[0].id : (alivePlayers.length > 1 ? alivePlayers.sort((a,b) => b.lives - a.lives)[0].id : null);
         await supabase.from('games').update({ status: 'ended', winner_id: winner }).eq('id', game_id)
     } else {
+        // AUTOMATIC START OF NEXT ROUND
         await supabase.from('games').update({ 
             status: 'waiting', 
             current_round: game.current_round - 1,
             turn_index: 0
-        }).eq('id', game_id)
+        }).eq('id', game_id);
+        
+        // Short delay to allow clients to see results before dealing? 
+        // User wants it direct, so let's just do it.
+        await startRound(supabase, game_id);
     }
 }
 
@@ -208,9 +213,10 @@ async function processBotTurns(supabase, game_id) {
     while (loop && safetyCounter < 10) {
         safetyCounter++
         const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
+        // If it's bidding or playing, bots act. 
         if (!game || game.status === 'ended' || game.status === 'waiting') break
         
-        const players = await getSortedPlayers(supabase, game_id)
+        const players = (await getSortedPlayers(supabase, game_id)).filter(p => p.lives > 0);
         const currentPlayer = players[game.turn_index]
         
         if (!currentPlayer || !currentPlayer.name.startsWith('Bot')) {

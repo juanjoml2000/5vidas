@@ -179,7 +179,17 @@ export default function App() {
 
   const startGame = async () => fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start-round', game_id: game.id }) });
   const placeBid = async (bid) => fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'place-bid', game_id: game.id, player_id: me.id, data: { bid } }) });
-  const playCard = async (cardId) => fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'play-card', game_id: game.id, player_id: me.id, data: { card_id: cardId } }) });
+  
+  const playCard = async (cardId) => {
+    // OPTIMISTIC UI: Remove card from hand immediately for instant feel
+    setMyCards(prev => prev.filter(c => c.id !== cardId));
+    fetch('/api/game', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ action: 'play-card', game_id: game.id, player_id: me.id, data: { card_id: cardId } }) 
+    });
+  };
+
   const addBot = async () => fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add-bot', game_id: game.id }) });
   const leaveGame = async () => { if (confirm('¿Abandonar partida?')) { await supabase.from('players').delete().eq('id', me.id); setGame(null); setView('lobby'); } };
 
@@ -225,7 +235,7 @@ export default function App() {
               {/* Profile Card */}
               <div className="relative bg-white/5 border border-white/10 p-8 rounded-[3rem] overflow-hidden group">
                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><User className="w-24 h-24" /></div>
-                   <h2 className="text-xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2">Tu Perfil <span className="text-[10px] text-slate-500 italic lowercase">v2.6</span></h2>
+                   <h2 className="text-xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2">Tu Perfil <span className="text-[10px] text-slate-500 italic lowercase">v2.7</span></h2>
                    <div className="space-y-4 relative z-10">
                       <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nickname Público</label>
@@ -289,8 +299,11 @@ export default function App() {
                 {players.map(p => (
                   <div key={p.id} className={`p-2 rounded-2xl border transition-all ${players[game.turn_index]?.id === p.id ? 'bg-red-600 border-red-400 scale-110' : 'bg-white/5 border-white/10 shadow-lg'}`}>
                     <div className="flex flex-col items-center gap-1">
-                       <span className="text-[8px] font-black uppercase opacity-60">{p.user_id === session.user.id ? 'TÚ' : p.name.substring(0,8)}</span>
-                       <div className="flex gap-0.5">{[...Array(p.lives)].map((_, i) => <Heart key={i} className={`w-2 h-2 ${players[game.turn_index]?.id === p.id ? 'fill-white' : 'fill-red-500'}`} />)}</div>
+                       <span className="text-[10px] font-black uppercase opacity-60">{p.user_id === session.user.id ? 'TÚ' : p.name.substring(0,8)}</span>
+                       <div className="flex items-center gap-1 text-xs font-black">
+                          <Heart className={`w-3 h-3 ${players[game.turn_index]?.id === p.id ? 'fill-white' : 'fill-red-500'}`} />
+                          <span className={players[game.turn_index]?.id === p.id ? 'text-white' : 'text-slate-300'}>{p.lives}</span>
+                       </div>
                        {p.current_bid !== null && <span className="text-[10px] font-black mt-1 bg-black/30 px-2 rounded-full">{p.tricks_won}/{p.current_bid}</span>}
                     </div>
                   </div>
@@ -357,7 +370,10 @@ export default function App() {
                {players.sort((a,b) => b.lives - a.lives).map((p, i) => (
                  <div key={p.id} className={`flex items-center justify-between p-6 rounded-[2rem] border ${i === 0 ? 'bg-amber-600/20 border-amber-500/50 scale-105' : 'bg-white/5 border-white/10 opacity-80'}`}>
                     <span className="font-black text-lg">{i+1}. {p.name}</span>
-                    <div className="flex gap-1 text-red-500">{[...Array(p.lives)].map((_, j) => <Heart key={j} className="fill-current w-3 h-3" />)}</div>
+                    <div className="flex items-center gap-2 font-black text-red-500">
+                      <Heart className="fill-current w-5 h-5" />
+                      <span className="text-2xl">{p.lives}</span>
+                    </div>
                  </div>
                ))}
              </div>
