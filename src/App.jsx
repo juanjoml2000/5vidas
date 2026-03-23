@@ -120,8 +120,9 @@ export default function App() {
 
   if (!session?.user) return <Auth />;
 
-  const me = (players || []).find(p => p.user_id === session.user.id);
-  const isHost = players && players[0] && players[0].user_id === session.user.id;
+  const me = (players || []).find(p => p.user_id === session?.user?.id);
+  const humanPlayers = (players || []).filter(p => !p.name.startsWith('Bot'));
+  const isHost = humanPlayers[0]?.user_id === session?.user?.id;
   const isMyTurn = game?.current_turn_id === me?.id;
   const everyoneBid = players && players.length > 0 && players.every(p => p.current_bid !== null);
 
