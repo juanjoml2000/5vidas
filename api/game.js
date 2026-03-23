@@ -47,18 +47,12 @@ async function startRound(supabase, game_id) {
     throw new Error('Game not found or not enough players')
   }
 
-  // 1. Prepare deck
   const suits = ['oros', 'copas', 'espadas', 'bastos']
   const values = [1, 2, 3, 4, 5, 6, 7, 10, 11, 12]
   let deck = []
-  suits.forEach(suit => {
-    values.forEach(value => {
-      deck.push({ suit, value })
-    })
-  })
+  suits.forEach(suit => values.forEach(value => deck.push({ suit, value })))
   deck = deck.sort(() => Math.random() - 0.5)
 
-  // 2. Deal
   const numCards = game.current_round
   let deckIdx = 0
   const dealtCards = []
@@ -76,24 +70,24 @@ async function startRound(supabase, game_id) {
 
   await supabase.from('cards').delete().eq('game_id', game_id)
   await supabase.from('cards').insert(dealtCards)
-  await supabase.from('games').update({ status: 'bidding', turn_index: 0, current_turn_id: players[0].id }).eq('id', game_id)
+  // Use turn_index only, since current_turn_id is not in schema
+  await supabase.from('games').update({ status: 'bidding', turn_index: 0 }).eq('id', game_id)
   await supabase.from('players').update({ current_bid: null, tricks_won: 0 }).eq('game_id', game_id)
 }
 
 async function placeBid(supabase, game_id, player_id, bid) {
     const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
-    if (game.current_turn_id !== player_id) throw new Error('Not your turn')
-
     const { data: players } = await supabase.from('players').select('*').eq('game_id', game_id).order('id')
+    
+    if (players[game.turn_index].id !== player_id) throw new Error('Not your turn')
+
     const currentIndex = players.findIndex(p => p.id === player_id)
 
-    // Last bidder constraint
     if (currentIndex === players.length - 1) {
         const totalOtherBids = players.reduce((sum, p) => p.id !== player_id ? sum + (p.current_bid || 0) : sum, 0)
         if (totalOtherBids + bid === game.current_round) {
-          // Automated bot choice if needed, otherwise throw for human
           if (players[currentIndex].name.startsWith('Bot')) {
-            bid = (bid === 0) ? 1 : bid - 1 // Simple bot adjustment
+            bid = (bid === 0) ? 1 : bid - 1
           } else {
             throw new Error(`Invalid bid: total bids cannot equal ${game.current_round}`)
           }
@@ -103,17 +97,18 @@ async function placeBid(supabase, game_id, player_id, bid) {
     await supabase.from('players').update({ current_bid: bid }).eq('id', player_id)
 
     if (currentIndex === players.length - 1) {
-        await supabase.from('games').update({ status: 'playing', turn_index: 0, current_turn_id: players[0].id }).eq('id', game_id)
+        await supabase.from('games').update({ status: 'playing', turn_index: 0 }).eq('id', game_id)
     } else {
-        await supabase.from('games').update({ turn_index: currentIndex + 1, current_turn_id: players[currentIndex + 1].id }).eq('id', game_id)
+        await supabase.from('games').update({ turn_index: currentIndex + 1 }).eq('id', game_id)
     }
 }
 
 async function playCard(supabase, game_id, player_id, card_id) {
     const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
-    if (game.current_turn_id !== player_id) throw new Error('Not your turn')
-
     const { data: players } = await supabase.from('players').select('*').eq('game_id', game_id).order('id')
+    
+    if (players[game.turn_index].id !== player_id) throw new Error('Not your turn')
+
     const currentIndex = players.findIndex(p => p.id === player_id)
 
     await supabase.from('cards').update({ is_played: true, played_at: new Date() }).eq('id', card_id)
@@ -138,11 +133,11 @@ async function playCard(supabase, game_id, player_id, card_id) {
         if (remainingCards === 0) {
             await resolveRound(supabase, game_id)
         } else {
-            await supabase.from('games').update({ turn_index: players.findIndex(p => p.id === winnerId), current_turn_id: winnerId }).eq('id', game_id)
+            await supabase.from('games').update({ turn_index: players.findIndex(p => p.id === winnerId) }).eq('id', game_id)
         }
     } else {
         const nextIndex = (currentIndex + 1) % players.length
-        await supabase.from('games').update({ turn_index: nextIndex, current_turn_id: players[nextIndex].id }).eq('id', game_id)
+        await supabase.from('games').update({ turn_index: nextIndex }).eq('id', game_id)
     }
 }
 
@@ -157,7 +152,7 @@ async function resolveRound(supabase, game_id) {
     })
     await Promise.all(playerUpdates)
 
-    const updatedPlayers = await supabase.from('players').select('*').eq('game_id', game_id).then(r => r.data)
+    const { data: updatedPlayers } = await supabase.from('players').select('*').eq('game_id', game_id)
     const alivePlayers = updatedPlayers.filter(p => p.lives > 0)
 
     if (alivePlayers.length <= 1 || game.current_round === 1) {
@@ -167,8 +162,7 @@ async function resolveRound(supabase, game_id) {
         await supabase.from('games').update({ 
             status: 'waiting', 
             current_round: game.current_round - 1,
-            turn_index: 0,
-            current_turn_id: null 
+            turn_index: 0
         }).eq('id', game_id)
     }
 }
@@ -190,9 +184,11 @@ async function processBotTurns(supabase, game_id) {
     while (loop && safetyCounter < 10) {
         safetyCounter++
         const { data: game } = await supabase.from('games').select('*').eq('id', game_id).single()
-        if (game.status === 'ended' || game.status === 'waiting') break
+        if (!game || game.status === 'ended' || game.status === 'waiting') break
         
-        const { data: currentPlayer } = await supabase.from('players').select('*').eq('id', game.current_turn_id).single()
+        const { data: players } = await supabase.from('players').select('*').eq('game_id', game_id).order('id')
+        const currentPlayer = players[game.turn_index]
+        
         if (!currentPlayer || !currentPlayer.name.startsWith('Bot')) {
             loop = false
             break

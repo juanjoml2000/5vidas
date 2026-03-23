@@ -123,7 +123,12 @@ export default function App() {
   const me = (players || []).find(p => p.user_id === session?.user?.id);
   const humanPlayers = (players || []).filter(p => !p.name.startsWith('Bot'));
   const isHost = humanPlayers[0]?.user_id === session?.user?.id;
-  const isMyTurn = game?.current_turn_id === me?.id;
+  
+  // Calculate current turn ID from turn_index and sorted players list
+  const sortedPlayers = [...(players || [])].sort((a,b) => a.id.localeCompare(b.id));
+  const currentPlayer = sortedPlayers[game?.turn_index || 0];
+  const isMyTurn = currentPlayer?.id === me?.id;
+  
   const everyoneBid = players && players.length > 0 && players.every(p => p.current_bid !== null);
 
   const startGame = async () => {
@@ -317,27 +322,30 @@ export default function App() {
               </div>
               
               <div className="flex items-center gap-3">
-                {(players || []).map(p => (
-                  <motion.div 
-                    key={p.id}
-                    animate={{ scale: game.current_turn_id === p.id ? 1.1 : 1 }}
-                    className={`relative p-3 rounded-2xl border transition-all ${game.current_turn_id === p.id ? 'bg-red-600 border-red-400 shadow-lg shadow-red-900/40' : 'bg-white/5 border-white/10'}`}
-                  >
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-[10px] uppercase font-black tracking-widest opacity-60">
-                        {p.user_id === session?.user?.id ? 'TÚ' : p.name.substring(0, 8)}
-                      </span>
-                      <div className="flex items-center gap-0.5">
-                        {[...Array(p.lives || 0)].map((_, i) => <Heart key={i} className={`w-3 h-3 ${game.current_turn_id === p.id ? 'fill-white' : 'fill-red-500'}`} />)}
-                      </div>
-                      {p.current_bid !== null && (
-                        <span className="text-xs font-bold mt-1 bg-black/20 px-2 py-0.5 rounded-full">
-                          {p.tricks_won || 0}/{p.current_bid}
+                {(players || []).map(p => {
+                  const isTurn = currentPlayer?.id === p.id;
+                  return (
+                    <motion.div 
+                      key={p.id}
+                      animate={{ scale: isTurn ? 1.1 : 1 }}
+                      className={`relative p-3 rounded-2xl border transition-all ${isTurn ? 'bg-red-600 border-red-400 shadow-lg shadow-red-900/40' : 'bg-white/5 border-white/10'}`}
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <span className="text-[10px] uppercase font-black tracking-widest opacity-60">
+                          {p.user_id === session?.user?.id ? 'TÚ' : p.name.substring(0, 8)}
                         </span>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
+                        <div className="flex items-center gap-0.5">
+                          {[...Array(p.lives || 0)].map((_, i) => <Heart key={i} className={`w-3 h-3 ${isTurn ? 'fill-white' : 'fill-red-500'}`} />)}
+                        </div>
+                        {p.current_bid !== null && (
+                          <span className="text-xs font-bold mt-1 bg-black/20 px-2 py-0.5 rounded-full">
+                            {p.tricks_won || 0}/{p.current_bid}
+                          </span>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             </div>
 
