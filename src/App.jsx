@@ -321,10 +321,11 @@ export default function App() {
             <>
               <button 
                 onClick={() => setIsChatOpen(!isChatOpen)} 
-                className="p-2 hover:bg-white/10 rounded-xl transition-colors relative text-red-500"
+                className="flex items-center gap-1.5 px-3 py-2 bg-red-600/10 hover:bg-red-600/20 rounded-xl transition-all border border-red-500/20 text-red-500 relative group"
               >
                 <MessageSquare className="w-6 h-6" />
-                {messages.length > 0 && <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-400 rounded-full border-2 border-black animate-pulse" />}
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Chat de Mesa</span>
+                {messages.length > 0 && <span className="absolute top-[-2px] right-[-2px] w-3 h-3 bg-red-400 rounded-full border-2 border-black animate-pulse" />}
               </button>
               <button onClick={copyInvite} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-emerald-500"><Share2 className="w-6 h-6" /></button>
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">{isMenuOpen ? <X /> : <Menu />}</button>
