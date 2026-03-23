@@ -16,16 +16,6 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const messagesEndRef = React.useRef(null);
-  
-  const toggleChat = () => {
-    setIsChatOpen(!isChatOpen);
-    if (!isChatOpen) setIsMenuOpen(false);
-  };
-  
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-    if (!isMenuOpen) setIsChatOpen(false);
-  };
   const me = (players || []).find(p => p.user_id === session?.user?.id);
   const isHost = session?.user?.id === game?.host_id;
   const [myCards, setMyCards] = useState([]);
@@ -119,8 +109,8 @@ export default function App() {
     }
     setTrickCards(table || []);
 
-    const { data: mData, error: mError } = await supabase.from('messages').select('*').eq('game_id', gameId).order('created_at', { ascending: true });
-    if (mError) console.error("Chat Error:", mError);
+    const { data: mData, error: mError } = await supabase.from('messages').select('*').eq('game_id', gameId || '00000000-0000-0000-0000-000000000000').order('created_at', { ascending: true });
+    if (mError) console.error("Error fetching messages:", mError);
     setMessages(mData || []);
   }, []);
 
@@ -129,7 +119,6 @@ export default function App() {
     const channel = supabase.channel(`game_sync:${game.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${game.id}` }, () => fetchGameState(game.id, session.user.id))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, (payload) => {
-        // Refresh on any change if it's our game OR any DELETE (to be safe)
         if (payload.eventType === 'DELETE' || (payload.new && payload.new.game_id === game.id)) {
           fetchGameState(game.id, session.user.id);
         }
@@ -194,6 +183,16 @@ export default function App() {
   }, [messages, isChatOpen]);
 
   useEffect(() => {
+    if (session && !game) {
+      const lobbyChannel = supabase.channel('lobby_chat')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `game_id=eq.00000000-0000-0000-0000-000000000000` }, () => fetchGameState(null, session.user.id))
+        .subscribe();
+      fetchGameState(null, session.user.id);
+      return () => { supabase.removeChannel(lobbyChannel); };
+    }
+  }, [session, game, fetchGameState]);
+
+  useEffect(() => {
     if (session && roomToJoin) {
       joinGame(roomToJoin);
       setRoomToJoin(null);
@@ -244,7 +243,7 @@ export default function App() {
       await supabase.from('players').insert({ 
         user_id: session.user.id, 
         game_id: gameId, 
-        name: profile?.display_name || session.user.user_metadata?.display_name || 'Jugador ' + session.user.id.slice(0, 4), 
+        name: profile?.display_name || session.user.email.split('@')[0], 
         lives: 5,
         created_at: new Date(),
         last_ping: new Date()
@@ -278,14 +277,14 @@ export default function App() {
   const addBot = async () => fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add-bot', game_id: game.id }) });
   
   const sendMessage = async () => {
-    if (!chatInput.trim() || !game || !me) return;
+    if (!chatInput.trim() || !session?.user) return;
     const { error } = await supabase.from('messages').insert({
-      game_id: game.id,
-      player_id: me.id,
-      name: me.name,
+      game_id: game?.id || '00000000-0000-0000-0000-000000000000',
+      player_id: me?.id || null,
+      name: profile?.nickname || session.user.user_metadata?.display_name || 'Anónimo',
       content: chatInput.trim()
     });
-    if (error) alert(error.message);
+    if (error) alert("Error al enviar: " + error.message);
     else setChatInput('');
   };
 
@@ -328,36 +327,27 @@ export default function App() {
         </div>
         <div className="flex items-center gap-2">
           {!game && <button onClick={() => setShowRules(true)} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-red-500"><Info className="w-6 h-6" /></button>}
+          {session && (
+            <button 
+              onClick={() => setIsChatOpen(!isChatOpen)} 
+              className="flex items-center gap-1.5 px-3 py-2 bg-red-600/10 hover:bg-red-600/20 rounded-xl transition-all border border-red-500/20 text-red-500 relative group"
+            >
+              <MessageSquare className="w-6 h-6" />
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">{game ? 'Chat de Mesa' : 'Chat Global'}</span>
+              {messages.length > 0 && <span className="absolute top-[-2px] right-[-2px] w-3 h-3 bg-red-400 rounded-full border-2 border-black animate-pulse" />}
+            </button>
+          )}
+          {!game && <button onClick={() => setShowRules(true)} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-red-500"><Info className="w-6 h-6" /></button>}
           {game && (
             <>
-              <button 
-                onClick={toggleChat} 
-                className="flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-white/10 rounded-xl transition-all border border-red-500/50 text-red-500 relative group animate-pulse-once"
-              >
-                <MessageSquare className="w-5 h-5" />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Hablar</span>
-                {messages.length > 0 && <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-400 rounded-full border-2 border-black animate-pulse" />}
-              </button>
-              <button onClick={copyInvite} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-emerald-500 ml-2"><Share2 className="w-6 h-6" /></button>
-              <button onClick={toggleMenu} className="p-2 hover:bg-white/10 rounded-xl transition-colors">{isMenuOpen ? <X /> : <Menu />}</button>
+              <button onClick={copyInvite} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-emerald-500"><Share2 className="w-6 h-6" /></button>
+              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">{isMenuOpen ? <X /> : <Menu />}</button>
             </>
           )}
           <div className="h-8 w-px bg-white/10 mx-2" />
           <button onClick={logout} className="flex items-center gap-2 px-4 py-2 text-red-400 font-bold rounded-xl active:scale-95 transition-all"><LogOut className="w-5 h-5" /><span className="hidden sm:inline uppercase">Salir</span></button>
         </div>
       </nav>
-
-      <AnimatePresence>
-        {(isMenuOpen || isChatOpen) && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
-            onClick={() => { setIsMenuOpen(false); setIsChatOpen(false); }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[55]" 
-          />
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {isMenuOpen && (
@@ -399,14 +389,14 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       <AnimatePresence>
         {isChatOpen && (
-          <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="fixed inset-y-0 left-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[70] border-r border-white/10 flex flex-col shadow-2xl shadow-black">
+          <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="fixed inset-y-0 left-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[60] border-r border-white/10 flex flex-col shadow-2xl shadow-black">
              <div className="p-6 border-b border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                    <MessageSquare className="w-5 h-5 text-red-500" />
-                   <h2 className="text-xl font-black italic uppercase tracking-tighter">Chat de Mesa</h2>
+                   <h2 className="text-xl font-black italic uppercase tracking-tighter">{game ? 'Chat de Mesa' : 'Chat Global'}</h2>
                 </div>
                 <button onClick={() => setIsChatOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button>
              </div>
@@ -414,7 +404,7 @@ export default function App() {
              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                 {messages.length === 0 && <p className="text-center text-slate-500 text-xs italic py-10">Sé el primero en decir algo...</p>}
                 {messages.map((m, idx) => {
-                   const isMe = m.player_id === me?.id;
+                   const isMe = m.player_id === me?.id || (m.name === (profile?.nickname || session?.user?.user_metadata?.display_name));
                    return (
                       <div key={idx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                          <div className={`max-w-[85%] p-3 rounded-2xl ${isMe ? 'bg-red-600 text-white rounded-br-none' : 'bg-white/10 text-slate-200 rounded-bl-none border border-white/5'}`}>

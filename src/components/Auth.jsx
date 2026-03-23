@@ -10,7 +10,9 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
-  const [isUpdatePassword, setIsUpdatePassword] = useState(false);
+   const [isUpdatePassword, setIsUpdatePassword] = useState(false);
+  const [showGuestNick, setShowGuestNick] = useState(false);
+  const [guestNick, setGuestNick] = useState('');
 
   React.useEffect(() => {
     // Also check hash directly on mount for robustness
@@ -81,9 +83,12 @@ export default function Auth() {
     setLoading(false);
   };
 
-  const handleAnonymous = async () => {
-    const guestName = window.prompt('Introduce tu Nickname para jugar:', 'Invitado_' + Math.floor(Math.random() * 1000));
-    if (!guestName) return;
+  const handleAnonymous = async (e) => {
+    if (e) e.preventDefault();
+    if (!guestNick.trim()) {
+      setShowGuestNick(true);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -93,7 +98,7 @@ export default function Auth() {
       
       if (user) {
         const { error: updateError } = await supabase.auth.updateUser({
-          data: { display_name: guestName }
+          data: { display_name: guestNick.trim() }
         });
         if (updateError) throw updateError;
       }
@@ -211,15 +216,46 @@ export default function Auth() {
           </button>
 
           {!isUpdatePassword && (
-            <button
-              type="button"
-              onClick={handleAnonymous}
-              disabled={loading}
-              className="w-full bg-white/5 hover:bg-white/10 text-white font-bold py-4 rounded-2xl border border-white/10 transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-lg"
-            >
-              <UserCircle className="w-5 h-5 opacity-70" />
-              Jugar como Invitado
-            </button>
+            <div className="space-y-4">
+              <AnimatePresence>
+                {showGuestNick && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                    <div className="relative group">
+                      <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-400" />
+                      <input 
+                        autoFocus
+                        type="text"
+                        placeholder="Tu Nickname..."
+                        className="w-full bg-emerald-500/10 border border-emerald-500/20 rounded-2xl py-4 pl-12 pr-4 text-white placeholder-emerald-300/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all text-lg"
+                        value={guestNick}
+                        onChange={(e) => setGuestNick(e.target.value)}
+                      />
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={handleAnonymous}
+                      disabled={loading || !guestNick.trim()}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl mt-3 transition-all flex items-center justify-center gap-2"
+                    >
+                      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar Nickname'}
+                    </button>
+                    <div className="h-4" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              
+              {!showGuestNick && (
+                <button
+                  type="button"
+                  onClick={() => setShowGuestNick(true)}
+                  disabled={loading}
+                  className="w-full bg-white/5 hover:bg-white/10 text-white font-bold py-4 rounded-2xl border border-white/10 transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-lg"
+                >
+                  <UserCircle className="w-5 h-5 opacity-70" />
+                  Jugar como Invitado
+                </button>
+              )}
+            </div>
           )}
         </form>
 
