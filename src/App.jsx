@@ -11,6 +11,7 @@ export default function App() {
   const [players, setPlayers] = useState([]);
   const [myCards, setMyCards] = useState([]);
   const [trickCards, setTrickCards] = useState([]);
+  const [waitingGames, setWaitingGames] = useState([]); // Other available games
   const [view, setView] = useState('lobby'); // lobby, bidding, playing, ended
   const [loading, setLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -91,6 +92,27 @@ export default function App() {
       supabase.removeChannel(channel);
     };
   }, [game?.id, session?.user?.id, fetchGameState]);
+
+  // Sync Lobby Games
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const fetchWaitingGames = async () => {
+      const { data } = await supabase.from('games').select('*, players(count)').eq('status', 'waiting');
+      setWaitingGames(data || []);
+    };
+
+    const lobbyChannel = supabase
+      .channel('lobby_sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, fetchWaitingGames)
+      .subscribe();
+
+    fetchWaitingGames();
+
+    return () => {
+      supabase.removeChannel(lobbyChannel);
+    };
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (game?.status === 'bidding') setView('bidding');
@@ -230,8 +252,31 @@ export default function App() {
                  </div>
               </button>
               <div className="bg-white/5 border border-white/10 p-8 rounded-[3rem] flex flex-col gap-6">
-                <div className="flex items-center justify-between"><h2 className="text-2xl font-black italic">SALAS</h2><Users className="text-red-500" /></div>
-                <p className="text-slate-600 text-center py-10 bg-black/20 rounded-[2rem] border border-dashed border-white/5 font-bold italic">Buscando mesas...</p>
+                <div className="flex items-center justify-between"><h2 className="text-2xl font-black italic uppercase tracking-tighter">Mesas Disponibles</h2><Users className="text-red-500" /></div>
+                
+                {waitingGames.length > 0 ? (
+                  <div className="space-y-3">
+                    {waitingGames.map(g => (
+                      <motion.button
+                        key={g.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        onClick={() => joinGame(g.id)}
+                        className="w-full flex items-center justify-between p-6 bg-white/5 hover:bg-white/10 border border-white/5 rounded-3xl transition-all group"
+                      >
+                        <div className="text-left">
+                           <p className="font-black text-lg text-slate-200">Mesa #{g.id.substring(0,4).toUpperCase()}</p>
+                           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{g.players?.[0]?.count || 0} / 4 Jugadores</p>
+                        </div>
+                        <div className="p-3 bg-red-600/10 text-red-500 rounded-2xl group-hover:bg-red-600 group-hover:text-white transition-all">
+                          <Plus className="w-5 h-5" />
+                        </div>
+                      </motion.button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-600 text-center py-10 bg-black/20 rounded-[2rem] border border-dashed border-white/5 font-bold italic">No hay mesas activas. ¡Crea una!</p>
+                )}
               </div>
             </div>
           </div>
