@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
 import Card from './components/Card';
 import Auth from './components/Auth';
-import { Heart, Trophy, Users, Play, Plus, LogOut, Menu, X, ShieldAlert, Zap } from 'lucide-react';
+import { Heart, Trophy, Users, Play, Plus, LogOut, Menu, X, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import confetti from 'canvas-confetti';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -41,10 +40,14 @@ export default function App() {
           const { data } = await supabase.from('players').select('*').eq('game_id', game.id).order('joined_at');
           setPlayers(data || []);
         })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cards', filter: `player_id=eq.${session.user.id}` }, 
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cards', filter: `game_id=eq.${game.id}` }, 
         async () => {
-          const { data } = await supabase.from('cards').select('*').eq('player_id', session.user.id).eq('is_played', false);
-          setMyCards(data || []);
+          // Re-fetch my cards when any card in the game changes
+          const myPlayer = players.find(p => p.user_id === session.user.id);
+          if (myPlayer) {
+            const { data } = await supabase.from('cards').select('*').eq('player_id', myPlayer.id).eq('is_played', false);
+            setMyCards(data || []);
+          }
         })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tricks', filter: `game_id=eq.${game.id}` }, 
         async () => {
@@ -56,7 +59,7 @@ export default function App() {
     return () => {
       supabase.removeChannel(gameChannel);
     };
-  }, [game?.id, session]);
+  }, [game?.id, session, players.length]); // Re-subscribe if players change to ensure 'me' is updated
 
   // Handle Game Logic Transitions
   useEffect(() => {
@@ -82,14 +85,18 @@ export default function App() {
   const joinGame = async (gameId) => {
     setLoading(true);
     try {
-      // Create or get player
-      const { data: existingPlayer } = await supabase.from('players').select('*').eq('game_id', gameId).eq('id', session.user.id).single();
+      // Create or get player using user_id to identify participation
+      const { data: existingPlayer } = await supabase.from('players')
+        .select('*')
+        .eq('game_id', gameId)
+        .eq('user_id', session.user.id)
+        .maybeSingle();
       
       if (!existingPlayer) {
         const { error: joinError } = await supabase.from('players').insert({
-          id: session.user.id,
+          user_id: session.user.id,
           game_id: gameId,
-          name: session.user.email.split('@')[0], // Use part of email as name
+          name: session.user.email.split('@')[0],
           lives: 5
         });
         if (joinError) throw joinError;
@@ -107,31 +114,41 @@ export default function App() {
     }
   };
 
+  const me = players.find(p => p.user_id === session.user.id);
+  const isMyTurn = game?.current_turn_id === me?.id;
+  const everyoneBid = players.every(p => p.current_bid !== null);
+
   const startGame = async () => {
     await fetch('/api/game', {
       method: 'POST',
-      body: JSON.stringify({ action: 'start-round', gameId: game.id })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'start-round', game_id: game.id })
     });
   };
 
   const placeBid = async (bid) => {
+    if (!me) return;
     await fetch('/api/game', {
       method: 'POST',
-      body: JSON.stringify({ action: 'place-bid', gameId: game.id, playerId: session.user.id, bid })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'place-bid', game_id: game.id, player_id: me.id, data: { bid } })
     });
   };
 
   const playCard = async (cardId) => {
+    if (!me) return;
     await fetch('/api/game', {
       method: 'POST',
-      body: JSON.stringify({ action: 'play-card', gameId: game.id, playerId: session.user.id, cardId })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'play-card', game_id: game.id, player_id: me.id, data: { card_id: cardId } })
     });
   };
 
   const leaveGame = async () => {
+    if (!me) return;
     if (confirm('¿Seguro que quieres abandonar la partida? Perderás tu progreso.')) {
       setLoading(true);
-      await supabase.from('players').delete().eq('id', session.user.id).eq('game_id', game.id);
+      await supabase.from('players').delete().eq('id', me.id);
       setGame(null);
       setView('lobby');
       setLoading(false);
@@ -143,10 +160,6 @@ export default function App() {
   };
 
   if (!session) return <Auth />;
-
-  const me = players.find(p => p.id === session.user.id);
-  const isMyTurn = game?.current_turn_id === session.user.id;
-  const everyoneBid = players.every(p => p.current_bid !== null);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-red-500/30 overflow-x-hidden">
@@ -206,10 +219,10 @@ export default function App() {
                 <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-4">Jugador</p>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-amber-500 rounded-2xl flex items-center justify-center font-bold text-xl">
-                    {me?.name[0].toUpperCase()}
+                    {me?.name ? me.name[0].toUpperCase() : 'U'}
                   </div>
                   <div>
-                    <p className="font-bold text-lg">{me?.name}</p>
+                    <p className="font-bold text-lg">{me?.name || 'Iniciando...'}</p>
                     <div className="flex items-center gap-1 text-red-500">
                       {[...Array(me?.lives || 0)].map((_, i) => <Heart key={i} className="w-4 h-4 fill-current" />)}
                     </div>
@@ -269,7 +282,7 @@ export default function App() {
                   <Users className="w-6 h-6 text-red-500" />
                 </div>
                 <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                  {/* Join logic would go here, simplified show list */}
+                  {/* Simplified salas list or automatic join could be here */}
                   <p className="text-slate-500 text-center py-8 bg-black/20 rounded-3xl border border-dashed border-white/10">No hay salas disponibles</p>
                 </div>
               </div>
@@ -300,7 +313,7 @@ export default function App() {
                   >
                     <div className="flex flex-col items-center gap-1">
                       <span className="text-[10px] uppercase font-black tracking-widest opacity-60">
-                        {p.id === session.user.id ? 'TÚ' : p.name.substring(0, 8)}
+                        {p.user_id === session.user.id ? 'TÚ' : p.name.substring(0, 8)}
                       </span>
                       <div className="flex items-center gap-0.5">
                         {[...Array(p.lives)].map((_, i) => <Heart key={i} className={`w-3 h-3 ${game.current_turn_id === p.id ? 'fill-white' : 'fill-red-500'}`} />)}
@@ -398,7 +411,7 @@ export default function App() {
                 </div>
               )}
 
-              {view === 'lobby' && players.length >= 2 && game.host_id === session.user.id && (
+              {view === 'lobby' && players.length >= 2 && game.host_id === me?.id && (
                 <div className="flex justify-center pt-8">
                   <button
                     onClick={startGame}
