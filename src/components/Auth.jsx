@@ -88,10 +88,15 @@ export default function Auth() {
     setLoading(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.signInAnonymously({
-        options: { data: { display_name: guestName } }
-      });
-      if (error) throw error;
+      const { data: { user }, error: signInError } = await supabase.auth.signInAnonymously();
+      if (signInError) throw signInError;
+      
+      if (user) {
+        const { error: updateError } = await supabase.auth.updateUser({
+          data: { display_name: guestName }
+        });
+        if (updateError) throw updateError;
+      }
     } catch (err) {
       setError(err.message.includes('not enabled') ? 'El administrador debe activar el "Inicio de sesión anónimo" en Supabase.' : err.message);
     } finally {

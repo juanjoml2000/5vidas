@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase';
 import Card from './components/Card';
 import Auth from './components/Auth';
-import { Heart, Trophy, Users, Play, Plus, LogOut, Menu, X, Zap, User, Save, Info } from 'lucide-react';
+import { Heart, Trophy, Users, Play, Plus, LogOut, Menu, X, Zap, User, Save, Info, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function App() {
@@ -269,6 +269,9 @@ export default function App() {
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed inset-y-0 right-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[60] border-l border-white/10 p-8 shadow-2xl shadow-black">
              <div className="flex items-center justify-between mb-12"><h2 className="text-2xl font-black italic uppercase tracking-tighter">OPCIONES</h2><button onClick={() => setIsMenuOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button></div>
               <div className="space-y-6">
+                  {game.status === 'waiting' && me.id === game.host_id && (
+                    <button onClick={() => { setIsMenuOpen(false); addBot(); }} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest text-blue-400"><Bot className="w-5 h-5" /> AÑADIR BOT</button>
+                  )}
                   <button onClick={() => { setIsMenuOpen(false); copyInvite(); }} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest text-emerald-400"><Plus className="w-5 h-5" /> INVITAR AMIGOS</button>
                   <button onClick={() => { setIsMenuOpen(false); setShowRules(true); }} className="w-full bg-white/5 hover:bg-white/10 text-white font-black py-4 rounded-2xl border border-white/10 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Info className="w-5 h-5 text-red-500" /> REGLAS DEL JUEGO</button>
                  <button onClick={() => { setIsMenuOpen(false); leaveGame(); }} className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-black py-4 rounded-2xl border border-red-500/20 transition-all flex items-center justify-center gap-3 active:scale-95 uppercase tracking-widest"><Zap className="w-5 h-5 fill-current" /> SALIR DE LA MESA</button>
@@ -444,7 +447,6 @@ export default function App() {
 
                {view === 'lobby' && (
                  <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
-                    {isHost && players.length < 4 && <button onClick={addBot} className="bg-white/5 text-white border border-white/10 px-8 py-5 rounded-3xl font-black text-lg active:scale-95 transition-all">AÑADIR BOT</button>}
                     {isHost && players.length >= 2 && <button onClick={startGame} className="bg-green-600 text-white px-12 py-5 rounded-3xl font-black text-xl shadow-xl shadow-green-900/40 active:scale-95 transition-all uppercase italic">¡Comenzar!</button>}
                     <button onClick={() => { setGame(null); setView('lobby'); }} className="bg-white/5 text-slate-500 px-8 py-5 rounded-3xl font-black text-lg active:scale-95 transition-all">VOLVER</button>
                  </div>
