@@ -11,6 +11,8 @@ export default function App() {
   const [newNick, setNewNick] = useState('');
   const [game, setGame] = useState(null);
   const [players, setPlayers] = useState([]);
+  const me = (players || []).find(p => p.user_id === session?.user?.id);
+  const isHost = session?.user?.id === game?.host_id;
   const [myCards, setMyCards] = useState([]);
   const [trickCards, setTrickCards] = useState([]);
   const [waitingGames, setWaitingGames] = useState([]);
@@ -150,6 +152,15 @@ export default function App() {
   }, [session?.user?.id]);
 
   useEffect(() => {
+    // KICK DETECTION: If I am in a game but I am not in the players list anymore...
+    if (game && players.length > 0 && !me && session?.user && !isHost) {
+      alert('⚠️ Has sido expulsado de la mesa por el anfitrión.');
+      setGame(null);
+      setView('lobby');
+    }
+  }, [players.length, me, game, session?.user, isHost]);
+
+  useEffect(() => {
     if (session && roomToJoin) {
       joinGame(roomToJoin);
       setRoomToJoin(null);
@@ -215,8 +226,6 @@ export default function App() {
   const logout = async () => { await supabase.auth.signOut(); };
   if (!session?.user || view === 'auth') return <Auth />;
 
-  const me = (players || []).find(p => p.user_id === session.user.id);
-  const isHost = session?.user?.id === game?.host_id;
   const isMyTurn = players[game?.turn_index || 0]?.id === me?.id;
   const everyoneBid = players.length > 0 && players.every(p => p.current_bid !== null);
 
