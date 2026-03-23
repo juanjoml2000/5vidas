@@ -91,10 +91,10 @@ export default function Auth() {
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-500 via-yellow-500 to-red-500" />
         
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-red-600 rounded-full mb-4 shadow-lg ring-4 ring-red-500/30">
-            <span className="text-4xl font-bold text-white">5</span>
+          <div className="flex items-center gap-3 justify-center mb-4">
+            <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-red-900/40"><span className="text-xl font-black italic text-white">5</span></div>
+            <span className="text-xl font-black tracking-tighter uppercase text-white">5 VIDAS</span>
           </div>
-          <h1 className="text-3xl font-black text-white tracking-tighter uppercase mb-2">5 VIDAS</h1>
           <p className="text-red-200 font-medium">
             {isUpdatePassword ? 'Establece tu nueva contraseña' : isSignUp ? 'Crea tu cuenta para jugar' : 'Inicia sesión para entrar al juego'}
           </p>
@@ -208,7 +208,7 @@ export default function Auth() {
       </motion.div>
       
       <p className="mt-8 text-red-200/50 text-sm font-medium flex flex-col items-center gap-1">
-        <span>© 2024 5 VIDAS - Juego de Cartas</span>
+        <span>© 2026 5 VIDAS - Juego de Cartas</span>
         <span className="text-red-500/80 font-black tracking-widest uppercase text-[10px]">Creado por Juanjo_xrd</span>
       </p>
     </div>
