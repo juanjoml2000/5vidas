@@ -16,6 +16,13 @@ CREATE TABLE games (
   name TEXT -- Custom room name
 );
 
+-- Profiles table: user display names
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  display_name TEXT,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Players table: participants in each game
 CREATE TABLE players (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -55,11 +62,22 @@ CREATE TABLE tricks (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Messages table: game chat messages
+CREATE TABLE messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_id UUID REFERENCES games(id) ON DELETE CASCADE,
+  player_id UUID REFERENCES players(id) ON DELETE CASCADE,
+  name TEXT,
+  content TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 2. Realtime Enablement
 ALTER PUBLICATION supabase_realtime ADD TABLE games;
 ALTER PUBLICATION supabase_realtime ADD TABLE players;
 ALTER PUBLICATION supabase_realtime ADD TABLE cards;
 ALTER PUBLICATION supabase_realtime ADD TABLE tricks;
+ALTER PUBLICATION supabase_realtime ADD TABLE messages;
 
 -- 3. Row Level Security (RLS)
 -- For a game, we want everyone to be able to read, but only authorized users to write
@@ -67,6 +85,8 @@ ALTER TABLE games ENABLE ROW LEVEL SECURITY;
 ALTER TABLE players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tricks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
 -- Allow public read for now (as requested for simplicity/multiplayer)
 CREATE POLICY "Public Read" ON games FOR SELECT USING (true);
@@ -77,6 +97,14 @@ CREATE POLICY "Public Read" ON cards FOR SELECT USING (true);
 CREATE POLICY "Public Write" ON cards FOR ALL USING (true);
 CREATE POLICY "Public Read" ON tricks FOR SELECT USING (true);
 CREATE POLICY "Public Write" ON tricks FOR ALL USING (true);
+
+-- Policies for profiles
+CREATE POLICY "Public Read" ON profiles FOR SELECT USING (true);
+CREATE POLICY "Public Write" ON profiles FOR ALL USING (true);
+
+-- Policies for messages
+CREATE POLICY "Public Read" ON messages FOR SELECT USING (true);
+CREATE POLICY "Public Write" ON messages FOR ALL USING (true);
 
 -- Functions
 -- Function to handle deck creation and dealing
