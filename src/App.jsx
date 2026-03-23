@@ -115,6 +115,7 @@ export default function App() {
   };
 
   const me = players.find(p => p.user_id === session.user.id);
+  const isHost = players[0]?.user_id === session.user.id;
   const isMyTurn = game?.current_turn_id === me?.id;
   const everyoneBid = players.every(p => p.current_bid !== null);
 
@@ -243,7 +244,7 @@ export default function App() {
       </AnimatePresence>
 
       <main className="relative z-10 p-4 max-w-5xl mx-auto">
-        {view === 'lobby' && (
+        {!game && view === 'lobby' && (
           <div className="py-12 flex flex-col items-center gap-12">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9 }}
@@ -290,7 +291,7 @@ export default function App() {
           </div>
         )}
 
-        {game && view !== 'lobby' && (
+        {game && (
           <div className="flex flex-col gap-6 pt-4">
             {/* Header: Game Info */}
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/5 backdrop-blur-md border border-white/10 p-4 md:p-6 rounded-3xl shadow-xl">
@@ -411,7 +412,7 @@ export default function App() {
                 </div>
               )}
 
-              {view === 'lobby' && players.length >= 2 && game.host_id === me?.id && (
+              {view === 'lobby' && players.length >= 2 && isHost && (
                 <div className="flex justify-center pt-8">
                   <button
                     onClick={startGame}
