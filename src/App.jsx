@@ -10,7 +10,7 @@ export default function App() {
   const [game, setGame] = useState(null);
   const [players, setPlayers] = useState([]);
   const [myCards, setMyCards] = useState([]);
-  const [tricks, setTricks] = useState([]);
+  const [trickCards, setTrickCards] = useState([]); // Cards currently on the table
   const [view, setView] = useState('lobby'); // lobby, bidding, playing, ended
   const [loading, setLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -44,14 +44,12 @@ export default function App() {
         async () => {
           const myPlayer = players.find(p => p.user_id === session.user.id);
           if (myPlayer) {
-            const { data } = await supabase.from('cards').select('*').eq('player_id', myPlayer.id).eq('is_played', false);
-            setMyCards(data || []);
+            const { data: hand } = await supabase.from('cards').select('*').eq('player_id', myPlayer.id).eq('is_played', false);
+            setMyCards(hand || []);
           }
-        })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tricks', filter: `game_id=eq.${game.id}` }, 
-        async () => {
-          const { data } = await supabase.from('tricks').select('*, card:cards(*)').eq('game_id', game.id).eq('round_number', game.current_round).order('created_at');
-          setTricks(data || []);
+          // Also fetch cards currently on the table (played but not in a trick yet)
+          const { data: table } = await supabase.from('cards').select('*, player:players(name)').eq('game_id', game.id).eq('is_played', true).is('trick_id', null).order('played_at');
+          setTrickCards(table || []);
         })
       .subscribe();
 
@@ -317,7 +315,7 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-2xl border border-white/10 font-bold text-slate-300">
                   <Trophy className="w-5 h-5 text-amber-500" />
-                  {tricks?.length || 0} Bazas Tiradas
+                  {game?.current_round} Cartas / Ronda
                 </div>
               </div>
               
@@ -352,23 +350,23 @@ export default function App() {
             <div className="relative min-h-[40vh] md:min-h-[50vh] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 to-black/80 rounded-[3rem] border border-white/5 flex items-center justify-center p-8 overflow-hidden">
                <div className="flex flex-wrap justify-center gap-4 relative z-10">
                 <AnimatePresence>
-                  {(tricks || []).map(t => (
+                  {(trickCards || []).map(t => (
                     <motion.div 
                       key={t.id}
                       initial={{ scale: 0, rotate: -45, y: 50 }}
                       animate={{ scale: 1, rotate: 0, y: 0 }}
                       className="relative"
                     >
-                      <Card card={t.card} disabled />
+                      <Card card={t} disabled />
                       <div className="absolute -top-3 -right-3 px-2 py-1 bg-red-600 rounded-lg text-[10px] font-black uppercase shadow-lg">
-                        {(players || []).find(p => p.id === t.player_id)?.name.split('@')[0]}
+                        {t.player?.name.split('@')[0]}
                       </div>
                     </motion.div>
                   ))}
                 </AnimatePresence>
                 
-                {(tricks || []).length === 0 && game.status === 'playing' && (
-                  <div className="text-slate-700 font-black text-4xl md:text-6xl tracking-tighter opacity-10 select-none">TABLERO</div>
+                {(trickCards || []).length === 0 && (game.status === 'playing' || game.status === 'bidding') && (
+                  <div className="text-slate-700 font-black text-4xl md:text-6xl tracking-tighter opacity-10 select-none uppercase">TAPETE</div>
                 )}
                </div>
 
@@ -384,48 +382,51 @@ export default function App() {
             </div>
 
             <div className="mt-4 pb-12">
-              {view === 'bidding' && (
-                <motion.div 
-                  initial={{ y: 50, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 md:p-12 shadow-2xl"
-                >
-                  <h3 className="text-center text-3xl font-black tracking-tight mb-8">¿CUÁNTAS BAZAS GANARÁS?</h3>
-                  <div className="flex flex-wrap justify-center gap-3 md:gap-4">
-                    {[...Array((game.current_round || 0) + 1)].map((_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => placeBid(i)}
-                        disabled={loading || me?.current_bid !== null}
-                        className={`
-                          w-14 h-14 md:w-20 md:h-20 rounded-2xl md:rounded-3xl border-2 transition-all active:scale-95 font-black text-xl md:text-2xl
-                          ${me?.current_bid === i ? 'bg-red-600 border-red-400 text-white shadow-xl shadow-red-900/40' : 'bg-white/5 border-white/10 hover:bg-white/10'}
-                          ${me?.current_bid !== null && me?.current_bid !== i ? 'opacity-30' : ''}
-                        `}
-                      >
-                        {i}
-                      </button>
+               {/* Show hand during bidding AND playing */}
+               {(view === 'bidding' || view === 'playing') && (
+                <div className="flex flex-col items-center gap-8">
+                  {view === 'bidding' && (
+                    <motion.div 
+                      initial={{ y: 50, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 md:p-12 shadow-2xl w-full"
+                    >
+                      <h3 className="text-center text-3xl font-black tracking-tight mb-8 uppercase">Apostar Bazas</h3>
+                      <div className="flex flex-wrap justify-center gap-3 md:gap-4">
+                        {[...Array((game.current_round || 0) + 1)].map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => placeBid(i)}
+                            disabled={loading || me?.current_bid !== null}
+                            className={`
+                              w-14 h-14 md:w-20 md:h-20 rounded-2xl md:rounded-3xl border-2 transition-all active:scale-95 font-black text-xl md:text-2xl
+                              ${me?.current_bid === i ? 'bg-red-600 border-red-400 text-white shadow-xl shadow-red-900/40' : 'bg-white/5 border-white/10 hover:bg-white/10'}
+                              ${me?.current_bid !== null && me?.current_bid !== i ? 'opacity-30' : ''}
+                            `}
+                          >
+                            {i}
+                          </button>
+                        ))}
+                      </div>
+                      {me?.current_bid !== null && !everyoneBid && (
+                        <p className="text-center mt-8 text-amber-500 font-bold animate-pulse tracking-wide italic">Esperando apuestas de los demás...</p>
+                      )}
+                    </motion.div>
+                  )}
+
+                  <div className="flex flex-wrap justify-center gap-2 md:gap-4 px-4 overflow-x-auto pb-4 pt-4">
+                    {(myCards || []).map(c => (
+                      <Card 
+                        key={c.id} 
+                        card={c} 
+                        onClick={() => isMyTurn && everyoneBid && view === 'playing' && playCard(c.id)}
+                        disabled={!isMyTurn || !everyoneBid || view !== 'playing'}
+                        isBlind={game.current_round === 1}
+                      />
                     ))}
                   </div>
-                  {me?.current_bid !== null && !everyoneBid && (
-                    <p className="text-center mt-8 text-amber-500 font-bold animate-pulse tracking-wide italic">Esperando apuestas de los demás...</p>
-                  )}
-                </motion.div>
-              )}
-
-              {view === 'playing' && (
-                <div className="flex flex-wrap justify-center gap-2 md:gap-4 px-4 overflow-x-auto pb-4 pt-8 md:pt-12">
-                   {(myCards || []).map(c => (
-                     <Card 
-                       key={c.id} 
-                       card={c} 
-                       onClick={() => isMyTurn && everyoneBid && playCard(c.id)}
-                       disabled={!isMyTurn || !everyoneBid}
-                       isBlind={game.current_round === 1}
-                     />
-                   ))}
                 </div>
-              )}
+               )}
 
               {view === 'lobby' && (
                 <div className="flex flex-col sm:flex-row justify-center gap-4 pt-8">
