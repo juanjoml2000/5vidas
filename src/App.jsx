@@ -107,15 +107,20 @@ export default function App() {
     if (!session?.user?.id) return;
 
     const fetchWaitingGames = async () => {
-      const { data } = await supabase.from('games').select('*, players(count)').eq('status', 'waiting');
-      // FILTER GHOST ROOMS: Only show games where at least 1 player is present
-      const activeWaiting = (data || []).filter(g => g.players?.[0]?.count > 0);
+      const { data, error } = await supabase.from('games').select('*, players(count)').eq('status', 'waiting');
+      if (error) { console.error("Lobby Fetch Error:", error); return; }
+      
+      // FILTER GHOST ROOMS: Strict check to only show games with > 0 players
+      const activeWaiting = (data || []).filter(g => {
+        const count = g.players?.[0]?.count || 0;
+        return count > 0;
+      });
       setWaitingGames(activeWaiting);
     };
 
     const lobbyChannel = supabase
       .channel('lobby_sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, fetchWaitingGames)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: 'status=eq.waiting' }, fetchWaitingGames)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchWaitingGames)
       .subscribe();
 
@@ -273,7 +278,13 @@ export default function App() {
               </button>
               
               <div className="bg-white/5 border border-white/10 p-8 rounded-[3rem] flex flex-col gap-6">
-                <div className="flex items-center justify-between"><h2 className="text-2xl font-black italic uppercase tracking-tighter">Mesas Disponibles</h2><Users className="text-red-500" /></div>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-black italic uppercase tracking-tighter">Mesas Disponibles</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-slate-500 italic">v2.1</span>
+                    <Users className="text-red-500" />
+                  </div>
+                </div>
                 
                 {waitingGames.length > 0 ? (
                   <div className="space-y-3">
