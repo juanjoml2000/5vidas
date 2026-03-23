@@ -19,6 +19,11 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
+    // Check for recovery hash directly on mount in case event fires too soon
+    if (window.location.hash.includes('type=recovery')) {
+      setView('auth');
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) fetchProfile(session.user.id, session.user.email);
@@ -239,7 +244,7 @@ export default function App() {
               {/* Profile Card */}
               <div className="relative bg-white/5 border border-white/10 p-8 rounded-[3rem] overflow-hidden group">
                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><User className="w-24 h-24" /></div>
-                   <h2 className="text-xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2">Tu Perfil <span className="text-[10px] text-slate-500 italic lowercase">v2.9</span></h2>
+                   <h2 className="text-xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2">Tu Perfil <span className="text-[10px] text-slate-500 italic lowercase">v3.1</span></h2>
                    <div className="space-y-4 relative z-10">
                       <div className="flex flex-col gap-2">
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Nickname Público</label>
