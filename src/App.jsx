@@ -236,10 +236,9 @@ export default function App() {
   const addBot = async () => fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add-bot', game_id: game.id }) });
   
   const copyInvite = () => {
-    if (!game) return;
-    const url = `${window.location.origin}/#game=${game.id}`;
+    const url = 'https://5vidas.vercel.app';
     navigator.clipboard.writeText(url);
-    alert('¡Enlace de invitación copiado! Envíalo a tus amigos para que se unan.');
+    alert('¡Enlace de la web copiado! Compártelo con tus amigos.');
   };
 
   const kickPlayer = async (targetId) => {
