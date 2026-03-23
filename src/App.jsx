@@ -117,20 +117,25 @@ export default function App() {
     if (!session?.user?.id) return;
 
     const fetchWaitingGames = async () => {
+      // NEW: Trigger server-side cleanup of dead players/games
+      try {
+        fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cleanup' }) }).catch(() => {});
+      } catch(e) {}
+
       // Fetch games with their players' ping info
       const { data } = await supabase.from('games').select('*, players(name, last_ping)').eq('status', 'waiting');
       
       const now = new Date();
       const activeWaiting = (data || []).filter(g => {
          const alivePlayers = (g.players || []).filter(p => {
-            if (!p.last_ping) return p.name.startsWith('Bot'); // Bots need ping too unless they just arrived
+            if (!p.last_ping) return false; 
             const pingDate = new Date(p.last_ping);
-            return Math.abs(now - pingDate) < 60000; // Alive if pinged in last 60s (with drift protection)
+            return Math.abs(now - pingDate) < 45000; // Even stricter: 45s
          });
          
          const hasHuman = alivePlayers.some(p => !p.name.startsWith('Bot'));
          g.activeCount = alivePlayers.length;
-         return hasHuman; // ROOM IS ONLY ALIVE IF A HUMAN IS PINGING
+         return hasHuman && g.activeCount > 0;
       });
 
       setWaitingGames(activeWaiting);
@@ -317,7 +322,7 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-black italic uppercase tracking-tighter">Mesas Disponibles</h2>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-slate-500 italic">v2.3</span>
+                    <span className="text-[10px] font-black text-slate-500 italic">v2.4</span>
                     <Users className="text-red-500" />
                   </div>
                 </div>

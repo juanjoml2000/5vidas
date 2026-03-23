@@ -31,9 +31,19 @@ export default async function handler(req, res) {
         await addBot(supabase, game_id)
         return res.status(200).json({ success: true })
       case 'heartbeat':
-         // NEW: Direct heartbeat via API to ensure service role can bypass some RLS if needed
          await supabase.from('players').update({ last_ping: new Date() }).eq('id', player_id)
          return res.status(200).json({ success: true })
+      case 'cleanup':
+         const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+         // 1. Delete dead players
+         await supabase.from('players').delete().lt('last_ping', fiveMinsAgo);
+         // 2. Identify games with 0 players
+         const { data: allWaiting } = await supabase.from('games').select('id, players(id)').eq('status', 'waiting');
+         const toDelete = (allWaiting || []).filter(g => !g.players || g.players.length === 0).map(g => g.id);
+         if (toDelete.length > 0) {
+            await supabase.from('games').delete().in('id', toDelete);
+         }
+         return res.status(200).json({ success: true, purged: toDelete.length })
       default:
         return res.status(400).json({ error: 'Invalid action' })
     }
@@ -188,7 +198,7 @@ async function addBot(supabase, game_id) {
         name: `Bot ${players.length + 1}`,
         lives: 5,
         created_at: new Date(),
-        last_ping: new Date() // Bots are always "pinging"
+        last_ping: new Date() 
     });
 }
 
