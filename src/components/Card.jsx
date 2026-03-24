@@ -21,13 +21,19 @@ const VALUES = {
   12: 'Rey',
 };
 
-export default function Card({ card, onClick, disabled, isSelected, isFaceDown, isBlind }) {
-  if (isFaceDown) {
+export default function Card({ card, onClick, disabled, isSelected, isFaceDown, isBlind, hidden, isPlayable }) {
+  if (isFaceDown || hidden) {
     return (
-      <div className="w-24 h-36 md:w-32 md:h-48 bg-red-900 rounded-xl border-4 border-red-700 shadow-2xl flex items-center justify-center relative overflow-hidden group">
+      <motion.button
+        whileHover={isPlayable ? { y: -10, scale: 1.05 } : {}}
+        whileTap={isPlayable ? { scale: 0.95 } : {}}
+        onClick={onClick}
+        disabled={disabled && !isPlayable}
+        className={`w-24 h-36 md:w-32 md:h-48 bg-red-900 rounded-xl border-4 border-red-700 shadow-2xl flex items-center justify-center relative overflow-hidden group ${isPlayable ? 'cursor-pointer ring-2 ring-amber-400 animate-pulse' : ''}`}
+      >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-red-800 to-red-950 opacity-50" />
         <div className="relative text-red-700 font-black text-4xl transform -rotate-12 transition-transform group-hover:rotate-0">5</div>
-      </div>
+      </motion.button>
     );
   }
 

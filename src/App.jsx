@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './lib/supabase';
 import Card from './components/Card';
 import Auth from './components/Auth';
@@ -27,6 +27,7 @@ export default function App() {
   const [showRules, setShowRules] = useState(false);
   const [otherCards, setOtherCards] = useState([]);
   const [roomToJoin, setRoomToJoin] = useState(null);
+  const fetchDebounce = useRef(null);
 
   useEffect(() => {
     // Check for recovery hash directly on mount in case event fires too soon
@@ -113,14 +114,18 @@ export default function App() {
 
   useEffect(() => {
     if (!session?.user?.id || !game?.id) return;
+    const debouncedFetch = () => {
+      if (fetchDebounce.current) clearTimeout(fetchDebounce.current);
+      fetchDebounce.current = setTimeout(() => fetchGameState(game.id, session.user.id), 150);
+    };
     const channel = supabase.channel(`game_sync:${game.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${game.id}` }, () => fetchGameState(game.id, session.user.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${game.id}` }, debouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, (payload) => {
         if (payload.eventType === 'DELETE' || (payload.new && payload.new.game_id === game.id)) {
-          fetchGameState(game.id, session.user.id);
+          debouncedFetch();
         }
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cards', filter: `game_id=eq.${game.id}` }, () => fetchGameState(game.id, session.user.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cards', filter: `game_id=eq.${game.id}` }, debouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `game_id=eq.${game.id}` }, () => fetchMessages(game.id))
       .subscribe();
     fetchGameState(game.id, session.user.id);
@@ -199,12 +204,10 @@ export default function App() {
         } catch(e) {}
       }
       fetchOthers();
-      const interval = setInterval(fetchOthers, 5000);
-      return () => clearInterval(interval);
     } else {
       setOtherCards([]);
     }
-  }, [game?.id, game?.current_round, game?.status]);
+  }, [game?.id, game?.current_round, game?.status, game?.turn_index]);
 
   useEffect(() => {
     if (game?.status === 'bidding') setView('bidding');
@@ -309,8 +312,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-red-500/30 overflow-x-hidden pb-10">
       <div className="fixed inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-600/30 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-600/30 blur-[120px] rounded-full" />
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-600/30 rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-600/30 rounded-full" />
       </div>
 
       <nav className="relative z-50 flex items-center justify-between px-6 py-4 bg-black/40 backdrop-blur-xl border-b border-white/10">
@@ -578,7 +581,7 @@ export default function App() {
                   </motion.div>
                 )}
                </div>
-               {isMyTurn && view === 'playing' && everyoneBid && <motion.div animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity }} className="absolute bottom-6 left-1/2 -translate-x-1/2 px-8 py-3 bg-amber-500 text-black font-black text-sm tracking-widest rounded-full shadow-2xl">TU TURNO</motion.div>}
+               {isMyTurn && view === 'playing' && everyoneBid && <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-8 py-3 bg-amber-500 text-black font-black text-sm tracking-widest rounded-full shadow-2xl animate-pulse">TU TURNO</div>}
             </div>
 
             <div className="mt-4">
