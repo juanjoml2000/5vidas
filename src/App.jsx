@@ -235,7 +235,6 @@ export default function App() {
     if (error) alert(error.message);
     else {
       setShowSpeedWarning(true);
-      setTimeout(() => setShowSpeedWarning(false), 8000);
       joinGame(data.id);
     }
     setLoading(false);
@@ -258,7 +257,6 @@ export default function App() {
       await supabase.from('players').update({ last_ping: new Date(), name: profile?.display_name }).eq('id', existingPlayer.id);
     }
     setShowSpeedWarning(true);
-    setTimeout(() => setShowSpeedWarning(false), 8000);
     fetchGameState(gameId, session.user.id);
     setLoading(false);
   };
@@ -340,13 +338,14 @@ export default function App() {
             exit={{ y: -100, opacity: 0, x: '-50%' }}
             className="fixed top-24 left-1/2 z-[100] w-[92%] max-w-md"
           >
-            <div className="bg-amber-500 text-black p-4 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-white/20">
-               <Zap className="w-6 h-6 fill-current shrink-0" />
+            <div className="bg-amber-500 text-black p-5 rounded-3xl shadow-[0_20px_50px_rgba(245,158,11,0.3)] flex items-center gap-4 border-4 border-black/10">
+               <div className="p-3 bg-black/10 rounded-2xl shrink-0"><Zap className="w-8 h-8 fill-current" /></div>
                <div className="flex-1">
-                  <p className="text-[10px] font-black uppercase tracking-tighter opacity-70">Aviso Speed Control</p>
-                  <p className="text-xs font-black uppercase leading-tight">Juega con calma. El juego tiene delay de red y se puede bugear.</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-1 opacity-60">Seguridad de Mesa</p>
+                  <p className="text-sm font-black uppercase leading-none mt-1">Juega despacio por favor.</p>
+                  <p className="text-[9px] font-bold uppercase opacity-80 mt-1">Hay delay de red. El juego se bugea si corres.</p>
                </div>
-               <button onClick={() => setShowSpeedWarning(false)} className="p-2 bg-black/10 rounded-xl hover:bg-black/20"><X className="w-4 h-4" /></button>
+               <button onClick={() => setShowSpeedWarning(false)} className="p-3 bg-black text-white hover:bg-slate-800 rounded-2xl transition-all active:scale-95"><X className="w-5 h-5" /></button>
             </div>
           </motion.div>
         )}
