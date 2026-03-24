@@ -1,83 +1,55 @@
-# 5 Vidas - El Juego de Cartas Online 🃏✨
+# 5 Vidas - Juego de Cartas Online
 
-**5 Vidas** es un emocionante juego de cartas multijugador en tiempo real diseñado para jugarse directamente desde el navegador. Inspirado en clásicos juegos de bazas, el objetivo es simple pero desafiante: predecir cuántas manos ganarás y ser el último jugador con vidas en pie.
+5 Vidas es una aplicación web de juego de cartas multijugador en tiempo real. Inspirado en mecánicas clásicas de juegos de bazas, el objetivo principal es la supervivencia: predecir con precisión el número de manos ganadas para conservar las vidas hasta el final de la partida.
 
-![Demo del Juego](https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=1000) *(Imagen ilustrativa de ambiente de juego)*
+## Características Principales
 
-## ✨ Características Principales
+- Multijugador en Tiempo Real: Creación de salas dinámicas con sincronización instantánea entre jugadores.
+- Bots de Juego: Posibilidad de añadir jugadores automatizados para completar las mesas de juego.
+- Chat de Mesa: Sistema de mensajería integrado para la comunicación directa durante las partidas.
+- Interfaz Moderna: Desarrollo basado en un diseño oscuro funcional con transiciones y animaciones optimizadas.
+- Adaptabilidad: Interfaz responde a diferentes tamaños de pantalla, permitiendo el juego en dispositivos móviles y escritorio.
+- Modo Ciego: Mecánica especial en la ronda final (o rondas de una carta) donde el jugador debe apostar basándose en el estado de la mesa sin conocer su propia carta.
 
-- 🎮 **Multijugador en Tiempo Real**: Crea una mesa y comparte el enlace con tus amigos para jugar al instante.
-- 🤖 **Bots Inteligentes**: ¿Te falta gente? Añade bots a la partida para completar la mesa.
-- 💬 **Chat Integrado**: Comunícate con tus oponentes durante la partida para añadirle picante al juego.
-- 🌓 **Diseño Moderno y Fluido**: Interfaz oscura premium con animaciones suaves gracias a Framer Motion y Tailwind CSS.
-- 📱 **Responsive**: Totalmente jugable desde dispositivos móviles o PC.
-- 🕶️ **Modo Ciego**: En la primera ronda, ¡jugarás sin ver tu propia carta!
+## Stack Tecnológico
 
-## 🚀 Tecnologías Utilizadas
+El proyecto ha sido construido utilizando tecnologías modernas para garantizar rendimiento y escalabilidad:
 
-Este proyecto utiliza un stack moderno para garantizar una experiencia de usuario rápida y sincronizada:
+- Frontend: React con Vite para un entorno de desarrollo y construcción rápido.
+- Estilos y UI: Tailwind CSS para el diseño visual y Framer Motion para la gestión de estados de animación.
+- Backend como Servicio: Supabase para el manejo de la base de datos PostgreSQL, autenticación de usuarios y suscripciones en tiempo real.
+- Iconografía: Lucide React.
+- Despliegue: Configurado para entornos de Hosting como Vercel a través de funciones serverless.
 
-- **Frontend**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/)
-- **Estilos y Animaciones**: [Tailwind CSS](https://tailwindcss.com/) + [Framer Motion](https://www.framer.com/motion/)
-- **Backend & Database**: [Supabase](https://supabase.com/) (Realtime, Auth y PostgreSQL)
-- **Iconos**: [Lucide React](https://lucide.dev/)
-- **API**: Serverless functions preparadas para entornos como Vercel.
+## Reglas del Juego
 
-## 📜 Reglas del Juego
+### Objetivo
+Cada jugador inicia con 5 vidas. El ganador es el último jugador que mantiene al menos una vida tras completar las rondas necesarias.
 
-### El Objetivo
-Cada jugador comienza con **5 Corazones (vidas)**. El último jugador que conserve al menos una vida gana la partida.
+### Dinámica
+1. Reparto: La cantidad de cartas repartidas disminuye progresivamente en cada ronda (ej. 5, 4, 3, 2, 1).
+2. Apuestas: Al inicio de la ronda, los jugadores deben indicar cuántas bazas (rondas individuales) ganarán.
+3. Restricción del Último: El último jugador en apostar no puede elegir un número que haga que la suma de apuestas sea igual al total de cartas repartidas. Esto asegura que siempre haya un desajuste y se pierdan vidas.
+4. Ronda de 1 Carta: Los jugadores ven las cartas de sus oponentes pero no la suya propia antes de realizar su apuesta.
 
-### Dinámica de las Rondas
-1. **Reparto**: Al inicio de cada ronda se reparten cartas. El número de cartas va disminuyendo: empezamos con 5 (o según el número de jugadores), luego 4, 3, 2 hasta llegar a la ronda crítica de **1 carta**.
-2. **Apuestas (Bidding)**: Tras ver tus cartas, debes predecir cuántas **bazas** (manos) crees que ganarás en esa ronda.
-3. **La Regla del Último (The Rule of 1)**: El último jugador en apostar tiene una restricción: la suma total de las apuestas de la mesa **no puede ser igual** al número de cartas repartidas. Esto garantiza que al menos un jugador perderá vidas esa ronda.
-4. **Modo Ciego**: En la ronda de 1 carta, no ves tu carta pero sí las de los demás. ¡Adivina basándote en lo que ves!
+### Sistema de Vidas
+Al finalizar cada ronda, se calcula la diferencia absoluta entre la apuesta realizada y las bazas ganadas. Dicha diferencia se resta del total de vidas del jugador.
 
-### Puntuación
-Al final de la ronda, se compara tu apuesta con las bazas que realmente ganaste.
-- Perderás **vidas iguales a la diferencia** entre tu apuesta y tu resultado.
-- *Ejemplo: Apostaste 2 pero ganaste 0 bazas -> Pierdes 2 vidas.*
-- *Ejemplo: Apostaste 1 y ganaste 1 baza -> No pierdes vidas.*
+## Instalación y Ejecución Local
 
-## 🛠️ Instalación y Configuración Local
-
-Si quieres montar el proyecto en tu entorno local, sigue estos pasos:
+Para ejecutar este proyecto en un entorno de desarrollo local:
 
 ### Prerrequisitos
-- [Node.js](https://nodejs.org/) (v18 o superior recomendado)
-- Una cuenta en [Supabase](https://supabase.com/) para la base de datos.
+- Node.js (versión 18 o superior).
+- Proyecto configurado en Supabase con las tablas correspondientes.
 
 ### Pasos
-1. **Clonar el repositorio**:
-   ```bash
-   git clone https://github.com/tu-usuario/web-5vidas.git
-   cd web-5vidas
-   ```
-
-2. **Instalar dependencias**:
-   ```bash
-   npm install
-   ```
-
-3. **Configurar variables de entorno**:
-   Crea un archivo `.env` en la raíz del proyecto basándote en `.env.example`:
-   ```env
-   VITE_SUPABASE_URL=tu_url_de_supabase
-   VITE_SUPABASE_ANON_KEY=tu_anon_key_de_supabase
-   SUPABASE_URL=tu_url_de_supabase
-   SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key
-   ```
-
-4. **Preparar la Base de Datos**:
-   Ejecuta el script SQL que se encuentra en `supabase/schema.sql` en el editor SQL de tu panel de Supabase para crear las tablas y políticas necesarias.
-
-5. **Ejecutar el proyecto**:
-   ```bash
-   npm run dev
-   ```
-   Abre [http://localhost:5173](http://localhost:5173) en tu navegador.
+1. Clonar el repositorio.
+2. Instalar las dependencias con: npm install.
+3. Configurar las variables de entorno en un archivo .env siguiendo la estructura de .env.example.
+4. Ejecutar el script SQL disponible en supabase/schema.sql dentro del panel de Supabase.
+5. Iniciar el servidor de desarrollo con: npm run dev.
 
 ---
 
-Creado con ❤️ por **Juanjo_xrd**.
+Desarrollado por Juanjo_xrd.
