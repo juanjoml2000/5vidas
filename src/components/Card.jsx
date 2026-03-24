@@ -21,7 +21,7 @@ const VALUES = {
   12: 'Rey',
 };
 
-export default function Card({ card, onClick, disabled, isSelected, isFaceDown, isBlind, hidden, isPlayable }) {
+function Card({ card, onClick, disabled, isSelected, isFaceDown, isBlind, hidden, isPlayable }) {
   if (isFaceDown || hidden) {
     return (
       <motion.button
@@ -85,3 +85,5 @@ export default function Card({ card, onClick, disabled, isSelected, isFaceDown, 
     </motion.button>
   );
 }
+
+export default React.memo(Card);

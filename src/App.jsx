@@ -27,7 +27,9 @@ export default function App() {
   const [showRules, setShowRules] = useState(false);
   const [otherCards, setOtherCards] = useState([]);
   const [roomToJoin, setRoomToJoin] = useState(null);
+  const [lastTrick, setLastTrick] = useState([]);
   const fetchDebounce = useRef(null);
+  const prevTrickRef = useRef([]);
 
   useEffect(() => {
     // Check for recovery hash directly on mount in case event fires too soon
@@ -109,6 +111,13 @@ export default function App() {
 
     // FIX 2: Only show cards currently on the table (no fallback to last trick)
     const { data: table } = await supabase.from('cards').select('*, player:players(name)').eq('game_id', gameId).eq('is_played', true).is('trick_id', null).order('played_at');
+    
+    // Last trick preview: if we had cards and now we don't, show them briefly
+    if (prevTrickRef.current.length > 0 && (!table || table.length === 0)) {
+      setLastTrick(prevTrickRef.current);
+      setTimeout(() => setLastTrick([]), 1500);
+    }
+    prevTrickRef.current = table || [];
     setTrickCards(table || []);
   }, []);
 
@@ -535,12 +544,18 @@ export default function App() {
               </div>
             </div>
 
-            <div className="relative min-h-[45vh] bg-slate-900/50 rounded-[3.5rem] border border-white/5 flex items-center justify-center p-8 overflow-hidden">
+            <div className="relative min-h-[40vh] bg-slate-900/50 rounded-2xl border border-white/5 flex items-center justify-center p-6 overflow-hidden">
                <div className="flex flex-wrap justify-center gap-4 relative z-10">
                   {trickCards.map(t => (
                     <div key={t.id} className="relative animate-[fadeIn_0.3s_ease-out]">
                        <Card card={t} disabled />
-                       <div className="absolute -top-3 -right-3 bg-red-600 px-3 py-1 rounded-xl text-[10px] font-black shadow-xl uppercase">{t.player?.name}</div>
+                       <div className="absolute -top-3 -right-3 bg-red-600 px-3 py-1 rounded-xl text-[10px] font-black uppercase">{t.player?.name}</div>
+                    </div>
+                  ))}
+                  {trickCards.length === 0 && lastTrick.length > 0 && lastTrick.map(t => (
+                    <div key={t.id} className="relative opacity-40 transition-opacity duration-1000">
+                       <Card card={t} disabled />
+                       <div className="absolute -top-3 -right-3 bg-red-600/50 px-3 py-1 rounded-xl text-[10px] font-black uppercase">{t.player?.name}</div>
                     </div>
                   ))}
 
