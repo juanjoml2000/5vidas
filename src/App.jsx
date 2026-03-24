@@ -84,13 +84,20 @@ export default function App() {
     setLoading(false);
   };
 
+  const fetchMessages = useCallback(async (gameId) => {
+    if (!gameId) return;
+    const { data } = await supabase.from('messages').select('*').eq('game_id', gameId).order('created_at', { ascending: true });
+    setMessages(data || []);
+  }, []);
+
   const fetchGameState = useCallback(async (gameId, userId) => {
     if (!gameId || !userId) return;
 
-    const { data: gData } = await supabase.from('games').select('*').eq('id', gameId).single();
+    const [{ data: gData }, { data: pData }] = await Promise.all([
+      supabase.from('games').select('*').eq('id', gameId).single(),
+      supabase.from('players').select('*').eq('game_id', gameId).order('created_at', { ascending: true })
+    ]);
     if (gData) setGame(gData);
-
-    const { data: pData } = await supabase.from('players').select('*').eq('game_id', gameId).order('created_at', { ascending: true });
     setPlayers(pData || []);
 
     const me = (pData || []).find(p => p.user_id === userId);
@@ -99,19 +106,9 @@ export default function App() {
       setMyCards(hand || []);
     }
 
-    let { data: table } = await supabase.from('cards').select('*, player:players(name)').eq('game_id', gameId).eq('is_played', true).is('trick_id', null).order('played_at');
-    if (!table || table.length === 0) {
-      const { data: lastTrick } = await supabase.from('tricks').select('id').eq('game_id', gameId).order('created_at', { ascending: false }).limit(1).maybeSingle();
-      if (lastTrick) {
-        const { data: lastCards } = await supabase.from('cards').select('*, player:players(name)').eq('trick_id', lastTrick.id).order('played_at');
-        table = lastCards;
-      }
-    }
+    // FIX 2: Only show cards currently on the table (no fallback to last trick)
+    const { data: table } = await supabase.from('cards').select('*, player:players(name)').eq('game_id', gameId).eq('is_played', true).is('trick_id', null).order('played_at');
     setTrickCards(table || []);
-
-    const { data: mData, error: mError } = await supabase.from('messages').select('*').eq('game_id', gameId || '00000000-0000-0000-0000-000000000000').order('created_at', { ascending: true });
-    if (mError) console.error("Error fetching messages:", mError);
-    setMessages(mData || []);
   }, []);
 
   useEffect(() => {
@@ -124,11 +121,12 @@ export default function App() {
         }
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cards', filter: `game_id=eq.${game.id}` }, () => fetchGameState(game.id, session.user.id))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `game_id=eq.${game.id}` }, () => fetchGameState(game.id, session.user.id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `game_id=eq.${game.id}` }, () => fetchMessages(game.id))
       .subscribe();
     fetchGameState(game.id, session.user.id);
+    fetchMessages(game.id);
     return () => { supabase.removeChannel(channel); };
-  }, [game?.id, session?.user?.id, fetchGameState]);
+  }, [game?.id, session?.user?.id, fetchGameState, fetchMessages]);
 
   useEffect(() => {
     if (!game || !me) return;
@@ -160,8 +158,7 @@ export default function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchWaitingGames)
       .subscribe();
     fetchWaitingGames();
-    const interval = setInterval(fetchWaitingGames, 30000);
-    return () => { supabase.removeChannel(lobbyChannel); clearInterval(interval); };
+    return () => { supabase.removeChannel(lobbyChannel); };
   }, [session?.user?.id]);
 
   useEffect(() => {
@@ -182,15 +179,7 @@ export default function App() {
     }
   }, [messages, isChatOpen]);
 
-  useEffect(() => {
-    if (session && !game) {
-      const lobbyChannel = supabase.channel('lobby_chat')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `game_id=eq.00000000-0000-0000-0000-000000000000` }, () => fetchGameState(null, session.user.id))
-        .subscribe();
-      fetchGameState(null, session.user.id);
-      return () => { supabase.removeChannel(lobbyChannel); };
-    }
-  }, [session, game, fetchGameState]);
+  // FIX 1: Global chat removed — chat only exists in-game
 
   useEffect(() => {
     if (session && roomToJoin) {
@@ -210,7 +199,7 @@ export default function App() {
         } catch(e) {}
       }
       fetchOthers();
-      const interval = setInterval(fetchOthers, 3000);
+      const interval = setInterval(fetchOthers, 5000);
       return () => clearInterval(interval);
     } else {
       setOtherCards([]);
@@ -277,20 +266,18 @@ export default function App() {
   const addBot = async () => fetch('/api/game', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add-bot', game_id: game.id }) });
   
   const sendMessage = async () => {
-    if (!chatInput.trim() || !session?.user) return;
-    const gId = game?.id || '00000000-0000-0000-0000-000000000000';
+    if (!chatInput.trim() || !game || !session?.user) return;
     const { error } = await supabase.from('messages').insert({
-      game_id: gId,
+      game_id: game.id,
       player_id: me?.id || null,
-      name: me?.name || profile?.nickname || session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || 'Anónimo',
+      name: me?.name || profile?.display_name || session.user.email?.split('@')[0] || 'Anónimo',
       content: chatInput.trim()
     });
     if (error) {
-      console.error("Error sending message:", error);
       alert("Error al enviar: " + error.message);
     } else {
       setChatInput('');
-      fetchGameState(game?.id || null, session.user.id);
+      fetchMessages(game.id);
     }
   };
 
@@ -333,17 +320,16 @@ export default function App() {
         </div>
         <div className="flex items-center gap-2">
           {!game && <button onClick={() => setShowRules(true)} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-red-500"><Info className="w-6 h-6" /></button>}
-          {session && (
+          {game && (
             <button 
               onClick={() => setIsChatOpen(!isChatOpen)} 
               className="flex items-center gap-1.5 px-3 py-2 bg-red-600/10 hover:bg-red-600/20 rounded-xl transition-all border border-red-500/20 text-red-500 relative group"
             >
               <MessageSquare className="w-6 h-6" />
-              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">{game ? 'Chat de Mesa' : 'Chat Global'}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Chat de Mesa</span>
               {messages.length > 0 && <span className="absolute top-[-2px] right-[-2px] w-3 h-3 bg-red-400 rounded-full border-2 border-black animate-pulse" />}
             </button>
           )}
-          {!game && <button onClick={() => setShowRules(true)} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-red-500"><Info className="w-6 h-6" /></button>}
           {game && (
             <>
               <button onClick={copyInvite} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-emerald-500"><Share2 className="w-6 h-6" /></button>
@@ -402,7 +388,7 @@ export default function App() {
              <div className="p-6 border-b border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                    <MessageSquare className="w-5 h-5 text-red-500" />
-                   <h2 className="text-xl font-black italic uppercase tracking-tighter">{game ? 'Chat de Mesa' : 'Chat Global'}</h2>
+                   <h2 className="text-xl font-black italic uppercase tracking-tighter">Chat de Mesa</h2>
                 </div>
                 <button onClick={() => setIsChatOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button>
              </div>
@@ -551,7 +537,7 @@ export default function App() {
                 <AnimatePresence>
                   {trickCards.map(t => (
                     <motion.div key={t.id} initial={{ scale: 0, y: 50 }} animate={{ scale: 1, y: 0 }} className="relative">
-                       <Card card={t} disabled />
+                       <Card card={t} disabled isFaceDown={game.current_round === 1} />
                        <div className="absolute -top-3 -right-3 bg-red-600 px-3 py-1 rounded-xl text-[10px] font-black shadow-xl uppercase">{t.player?.name}</div>
                     </motion.div>
                   ))}
@@ -567,16 +553,25 @@ export default function App() {
                      <div className="bg-slate-900 border border-white/20 rounded-[2.5rem] p-8 shadow-2xl w-full max-w-lg">
                         <h3 className="text-center text-xl font-black mb-6 italic tracking-tighter uppercase">¿CUÁNTAS BAZAS TE LLEVAS?</h3>
                         <div className="flex flex-wrap justify-center gap-2">
-                           {[...Array(game.current_round + 1)].map((_, i) => (
-                             <button 
-                               key={i} 
-                               onClick={() => placeBid(i)} 
-                               disabled={loading || me?.current_bid !== null} 
-                               className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl border-2 font-black text-lg transition-all ${me?.current_bid === i ? 'bg-red-600 border-red-400 scale-110 shadow-lg' : 'bg-white/5 border-white/20 hover:bg-white/10'}`}
-                             >
-                               {i}
-                             </button>
-                           ))}
+                           {(() => {
+                             const numBids = players.filter(p => p.current_bid !== null).length;
+                             const isLastBidder = numBids === players.length - 1;
+                             const totalOtherBids = players.reduce((sum, p) => p.id !== me?.id ? sum + (p.current_bid || 0) : sum, 0);
+                             const forbiddenBid = isLastBidder && game.current_round > 1 ? game.current_round - totalOtherBids : -1;
+                             return [...Array(game.current_round + 1)].map((_, i) => {
+                               if (i === forbiddenBid) return null;
+                               return (
+                                 <button 
+                                   key={i} 
+                                   onClick={() => placeBid(i)} 
+                                   disabled={loading || me?.current_bid !== null} 
+                                   className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl border-2 font-black text-lg transition-all ${me?.current_bid === i ? 'bg-red-600 border-red-400 scale-110 shadow-lg' : 'bg-white/5 border-white/20 hover:bg-white/10'}`}
+                                 >
+                                   {i}
+                                 </button>
+                               );
+                             });
+                           })()}
                         </div>
                         {me?.current_bid !== null && <p className="text-center mt-6 text-amber-500 font-bold animate-pulse text-sm">Esperando al resto...</p>}
                      </div>
