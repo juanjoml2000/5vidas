@@ -507,7 +507,7 @@ export default function App() {
 
         {game && (
           <div className="flex flex-col gap-4 pt-4">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-3xl">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white/5 border border-white/10 p-4 rounded-2xl">
               <div className="flex items-center gap-3">
                 <div className="px-5 py-2 bg-red-600 rounded-2xl font-black text-sm">RONDA {game.current_round}</div>
                 <div className="px-5 py-2 bg-black/40 border border-white/10 rounded-2xl font-black text-sm text-slate-400 italic">TURNO: {players[game.turn_index]?.name || '...'}</div>
@@ -629,19 +629,9 @@ export default function App() {
         )}
       </main>
 
-      <AnimatePresence>
-        {showRules && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              className="bg-slate-900 border border-white/10 rounded-[3rem] p-8 max-w-2xl w-full shadow-2xl relative"
-            >
+      {showRules && (
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-8 max-w-2xl w-full shadow-2xl relative">
                <button onClick={() => setShowRules(false)} className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
                
                <div className="flex items-center gap-4 mb-8">
@@ -681,10 +671,9 @@ export default function App() {
                >
                   ¡Entendido, a jugar!
                </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
+      )}
       <footer className="relative z-10 py-12 flex flex-col items-center gap-6">
         <div className="flex items-center gap-4 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all">
           <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center font-black">5</div>
