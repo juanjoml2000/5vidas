@@ -316,7 +316,7 @@ export default function App() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-600/30 rounded-full" />
       </div>
 
-      <nav className="relative z-50 flex items-center justify-between px-6 py-4 bg-black/40 backdrop-blur-xl border-b border-white/10">
+      <nav className="relative z-50 flex items-center justify-between px-6 py-4 bg-black/80 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-red-900/40"><span className="text-xl font-black italic">5</span></div>
           <span className="text-xl font-black tracking-tighter uppercase">5 VIDAS</span>
@@ -346,7 +346,7 @@ export default function App() {
 
       <AnimatePresence>
         {isMenuOpen && (
-          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed inset-y-0 right-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[60] border-l border-white/10 p-8 shadow-2xl shadow-black">
+          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed inset-y-0 right-0 w-80 bg-slate-900 z-[60] border-l border-white/10 p-8 shadow-2xl shadow-black">
              <div className="flex items-center justify-between mb-12">
                 <h2 className="text-2xl font-black italic uppercase tracking-tighter">OPCIONES</h2>
                 <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button>
@@ -387,7 +387,7 @@ export default function App() {
 
       <AnimatePresence>
         {isChatOpen && (
-          <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="fixed inset-y-0 left-0 w-80 bg-slate-900/95 backdrop-blur-2xl z-[60] border-r border-white/10 flex flex-col shadow-2xl shadow-black">
+          <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="fixed inset-y-0 left-0 w-80 bg-slate-900 z-[60] border-r border-white/10 flex flex-col shadow-2xl shadow-black">
              <div className="p-6 border-b border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                    <MessageSquare className="w-5 h-5 text-red-500" />
@@ -537,22 +537,17 @@ export default function App() {
 
             <div className="relative min-h-[45vh] bg-slate-900/50 rounded-[3.5rem] border border-white/5 flex items-center justify-center p-8 overflow-hidden">
                <div className="flex flex-wrap justify-center gap-4 relative z-10">
-                <AnimatePresence>
                   {trickCards.map(t => (
-                    <motion.div key={t.id} initial={{ scale: 0, y: 50 }} animate={{ scale: 1, y: 0 }} className="relative">
+                    <div key={t.id} className="relative animate-[fadeIn_0.3s_ease-out]">
                        <Card card={t} disabled />
                        <div className="absolute -top-3 -right-3 bg-red-600 px-3 py-1 rounded-xl text-[10px] font-black shadow-xl uppercase">{t.player?.name}</div>
-                    </motion.div>
+                    </div>
                   ))}
-                </AnimatePresence>
+
                 {trickCards.length === 0 && (game.status === 'playing' || game.status === 'bidding') && <div className="text-white/5 font-black text-8xl italic select-none">TABLERO</div>}
                 
                 {view === 'bidding' && isMyTurn && (
-                  <motion.div 
-                    initial={{ scale: 0.8, opacity: 0 }} 
-                    animate={{ scale: 1, opacity: 1 }} 
-                    className="absolute inset-0 z-40 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 rounded-[3.5rem]"
-                  >
+                  <div className="absolute inset-0 z-40 bg-slate-900/60 flex items-center justify-center p-4 rounded-[3.5rem]">
                      <div className="bg-slate-900 border border-white/20 rounded-[2.5rem] p-8 shadow-2xl w-full max-w-lg">
                         <h3 className="text-center text-xl font-black mb-6 italic tracking-tighter uppercase">¿CUÁNTAS BAZAS TE LLEVAS?</h3>
                         <div className="flex flex-wrap justify-center gap-2">
@@ -578,7 +573,7 @@ export default function App() {
                         </div>
                         {me?.current_bid !== null && <p className="text-center mt-6 text-amber-500 font-bold animate-pulse text-sm">Esperando al resto...</p>}
                      </div>
-                  </motion.div>
+                  </div>
                 )}
                </div>
                {isMyTurn && view === 'playing' && everyoneBid && <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-8 py-3 bg-amber-500 text-black font-black text-sm tracking-widest rounded-full shadow-2xl animate-pulse">TU TURNO</div>}

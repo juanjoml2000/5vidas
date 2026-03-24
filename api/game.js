@@ -44,6 +44,11 @@ export default async function handler(req, res) {
             return res.status(403).json({ error: 'No autorizado: Solo el anfitrión puede expulsar' });
          }
          
+         // Delete related records first to avoid FK constraint errors
+         await supabase.from('tricks').delete().eq('winner_id', data.target_id);
+         await supabase.from('cards').delete().eq('player_id', data.target_id);
+         await supabase.from('messages').delete().eq('player_id', data.target_id);
+         
          const { error: delError } = await supabase.from('players').delete().eq('id', data.target_id);
          if (delError) return res.status(500).json({ error: delError.message });
          
