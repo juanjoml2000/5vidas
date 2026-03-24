@@ -245,21 +245,29 @@ export default function Auth() {
                     >
                       {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Confirmar Nickname'}
                     </button>
+                    <p className="text-[10px] text-emerald-400/80 mt-2 text-center leading-tight">
+                      ⚠️ Los invitados **no pueden crear salas**, solo unirte a mesas ya creadas.
+                    </p>
                     <div className="h-4" />
                   </motion.div>
                 )}
               </AnimatePresence>
               
               {!showGuestNick && (
-                <button
-                  type="button"
-                  onClick={() => setShowGuestNick(true)}
-                  disabled={loading}
-                  className="w-full bg-white/5 hover:bg-white/10 text-white font-bold py-4 rounded-2xl border border-white/10 transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-lg"
-                >
-                  <UserCircle className="w-5 h-5 opacity-70" />
-                  Jugar como Invitado
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowGuestNick(true)}
+                    disabled={loading}
+                    className="w-full bg-white/5 hover:bg-white/10 text-white font-bold py-4 rounded-2xl border border-white/10 transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-lg"
+                  >
+                    <UserCircle className="w-5 h-5 opacity-70" />
+                    Jugar como Invitado
+                  </button>
+                  <p className="text-[10px] text-red-300/40 mt-3 text-center leading-tight px-4 italic">
+                    *Como invitado solo podrás unirte a partidas existentes. Crea una cuenta para ser el anfitrión.*
+                  </p>
+                </>
               )}
             </div>
           )}
