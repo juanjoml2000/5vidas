@@ -28,6 +28,7 @@ export default function App() {
   const [otherCards, setOtherCards] = useState([]);
   const [roomToJoin, setRoomToJoin] = useState(null);
   const [lastTrick, setLastTrick] = useState([]);
+  const [showSpeedWarning, setShowSpeedWarning] = useState(false);
   const fetchDebounce = useRef(null);
   const prevTrickRef = useRef([]);
 
@@ -232,7 +233,11 @@ export default function App() {
     setLoading(true);
     const { data, error } = await supabase.from('games').insert({ status: 'waiting', name: name || 'Nueva Mesa', host_id: session.user.id }).select().single();
     if (error) alert(error.message);
-    else joinGame(data.id);
+    else {
+      setShowSpeedWarning(true);
+      setTimeout(() => setShowSpeedWarning(false), 8000);
+      joinGame(data.id);
+    }
     setLoading(false);
   };
 
@@ -252,6 +257,8 @@ export default function App() {
     } else {
       await supabase.from('players').update({ last_ping: new Date(), name: profile?.display_name }).eq('id', existingPlayer.id);
     }
+    setShowSpeedWarning(true);
+    setTimeout(() => setShowSpeedWarning(false), 8000);
     fetchGameState(gameId, session.user.id);
     setLoading(false);
   };
@@ -321,9 +328,29 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-red-500/30 overflow-x-hidden pb-10">
       <div className="fixed inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-600/30 rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-600/30 rounded-full" />
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-red-600/30 rounded-full blur-[100px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-600/30 rounded-full blur-[100px]" />
       </div>
+
+      <AnimatePresence>
+        {showSpeedWarning && (
+          <motion.div 
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -50, opacity: 0 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-md"
+          >
+            <div className="bg-amber-500 text-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border-2 border-amber-400">
+               <Zap className="w-8 h-8 fill-current shrink-0" />
+               <div className="text-xs font-black uppercase leading-tight">
+                  <p>¡Atención Jugador!</p>
+                  <p className="opacity-80 font-bold">El juego tiene un pequeño delay de red. Juega con calma para evitar errores.</p>
+               </div>
+               <button onClick={() => setShowSpeedWarning(false)} className="ml-auto p-1 bg-black/10 rounded-lg"><X className="w-4 h-4" /></button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <nav className="relative z-50 flex items-center justify-between px-6 py-4 bg-black/80 border-b border-white/10">
         <div className="flex items-center gap-3">
@@ -645,46 +672,75 @@ export default function App() {
       </main>
 
       {showRules && (
-        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl p-8 max-w-2xl w-full shadow-2xl relative">
+        <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4 overflow-y-auto sm:py-10">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 md:p-10 max-w-3xl w-full shadow-2xl relative my-auto">
                <button onClick={() => setShowRules(false)} className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
                
                <div className="flex items-center gap-4 mb-8">
-                  <div className="bg-red-600 p-4 rounded-3xl shrink-0"><Info className="w-8 h-8 text-white" /></div>
+                  <div className="bg-red-600 p-4 rounded-3xl shrink-0"><Play className="w-8 h-8 text-white fill-current" /></div>
                   <div>
-                     <h2 className="text-3xl font-black italic uppercase tracking-tighter">Cómo Jugar</h2>
-                     <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-1">Reglas Oficiales de 5 Vidas</p>
+                     <h2 className="text-4xl font-black italic uppercase tracking-tighter leading-none">Cómo Jugar</h2>
+                     <p className="text-red-500 font-bold uppercase text-xs tracking-widest mt-1">Guía para Principiantes</p>
                   </div>
                </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 text-sm">
-                  <div className="space-y-4">
-                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                        <h3 className="text-red-400 font-black uppercase text-xs mb-2">1. Las Rondas</h3>
-                        <p className="text-slate-300">Empezamos con **5 cartas**. Cada ronda el número de cartas baja: 4, 3, 2 hasta llegar a **1**.</p>
+               <div className="space-y-6 text-sm md:text-base mb-10">
+                  <section className="bg-white/5 p-5 rounded-2xl border border-white/5 group hover:border-red-500/30 transition-colors">
+                     <h3 className="text-white font-black uppercase flex items-center gap-3 mb-2">
+                        <span className="w-6 h-6 bg-red-600 rounded-lg flex items-center justify-center text-[10px] italic">01</span>
+                        El Objetivo del Juego
+                     </h3>
+                     <p className="text-slate-400 leading-relaxed italic">Tu meta es sobrevivir. Empiezas con **5 Corazones (vidas)**. El último jugador con al menos una vida en pie, gana la partida.</p>
+                  </section>
+
+                  <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                        <h3 className="text-white font-black uppercase flex items-center gap-3 mb-3">
+                           <span className="w-6 h-6 bg-red-600 rounded-lg flex items-center justify-center text-[10px] italic">02</span>
+                           Las Rondas
+                        </h3>
+                        <p className="text-slate-400 text-sm">Se juegan rondas descendentes: primero con **5 cartas**, luego 4, 3, 2 y finalmente la ronda de **1 carta**.</p>
                      </div>
-                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                        <h3 className="text-red-400 font-black uppercase text-xs mb-2">2. La Apuesta</h3>
-                        <p className="text-slate-300">Al ver tus cartas, debes decir cuántas **bazas** (veces que ganarás la carta del centro) te llevarás.</p>
+                     <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                        <h3 className="text-white font-black uppercase flex items-center gap-3 mb-3">
+                           <span className="w-6 h-6 bg-red-600 rounded-lg flex items-center justify-center text-[10px] italic">03</span>
+                           Apostar (Predicción)
+                        </h3>
+                        <p className="text-slate-400 text-sm">Al ver tus cartas, debes adivinar cuántas **bazas** ganarás. Ganar una baza es llevarse las cartas del centro en un turno.</p>
                      </div>
-                  </div>
-                  <div className="space-y-4">
-                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                        <h3 className="text-red-400 font-black uppercase text-xs mb-2">3. El Último Postor</h3>
-                        <p className="text-slate-300 italic">"Regla de Oro": El último en apostar NO puede decir un número que haga que la suma de apuestas cuadre con las cartas.</p>
-                     </div>
-                     <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
-                        <h3 className="text-red-400 font-black uppercase text-xs mb-2">4. Puntuación</h3>
-                        <p className="text-slate-300 text-xs">Pierdes vidas según la diferencia: Si pides 2 y te llevas 0, pierdes **2 vidas**. Si aciertas exactamente, ¡no pierdes nada!</p>
-                     </div>
-                  </div>
+                  </section>
+
+                  <section className="bg-white/5 p-5 rounded-2xl border border-white/10 relative overflow-hidden">
+                     <div className="absolute top-0 right-0 p-4 opacity-10"><Zap className="w-12 h-12" /></div>
+                     <h3 className="text-amber-500 font-black uppercase mb-3 flex items-center gap-2">⚠️ La Regla del Último</h3>
+                     <p className="text-slate-300 text-sm leading-relaxed">
+                        El último jugador en apostar tiene una restricción: **La suma de todas las apuestas no puede ser igual al número de cartas de la ronda.** 
+                        <br/><span className="text-slate-500 text-[11px] mt-2 block italic">(Ejemplo: En ronda de 5, si los otros han pedido 2 y 2, tú NO puedes pedir 1. Así, alguien siempre pierde).</span>
+                     </p>
+                  </section>
+
+                  <section className="bg-white/5 p-5 rounded-2xl border border-white/5">
+                     <h3 className="text-white font-black uppercase mb-3 flex items-center gap-3">
+                        <span className="w-6 h-6 bg-red-600 rounded-lg flex items-center justify-center text-[10px] italic">04</span>
+                        Puntuación y Corazones
+                     </h3>
+                     <p className="text-slate-400 text-sm leading-relaxed">
+                        Al final de la ronda, comparamos tu apuesta con lo que ganaste. 
+                        **Pierdes vidas por cada punto de diferencia.**
+                        <br/><span className="text-red-400 font-bold italic">Si pides 2 y ganas 0 → Pierdes 2 vidas. Si aciertas exacto → 0 vidas perdidas.</span>
+                     </p>
+                  </section>
+
+                  <section className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                     <p className="text-emerald-400 text-xs font-bold uppercase text-center tracking-widest">💡 Consejo de Experto: La Ronda 1 es "Ciega", no ves tu propia carta.</p>
+                  </section>
                </div>
 
                <button 
                   onClick={() => setShowRules(false)}
-                  className="w-full bg-white text-black py-4 rounded-2xl font-black uppercase hover:scale-[1.02] transition-all"
+                  className="w-full bg-red-600 hover:bg-red-500 text-white py-5 rounded-2xl font-black uppercase text-lg shadow-xl shadow-red-900/40 active:scale-95 transition-all"
                >
-                  ¡Entendido, a jugar!
+                  ¡Estoy listo, a jugar!
                </button>
           </div>
         </div>
