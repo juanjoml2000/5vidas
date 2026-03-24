@@ -355,7 +355,7 @@ export default function App() {
 
       <AnimatePresence>
         {isMenuOpen && (
-          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed inset-y-0 right-0 w-80 bg-slate-900 z-[60] border-l border-white/10 p-8 shadow-2xl shadow-black">
+          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed inset-y-0 right-0 w-80 bg-slate-900/95 z-[60] border-l border-white/10 p-8 shadow-2xl">
              <div className="flex items-center justify-between mb-12">
                 <h2 className="text-2xl font-black italic uppercase tracking-tighter">OPCIONES</h2>
                 <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-white/5 rounded-full"><X /></button>
@@ -396,7 +396,7 @@ export default function App() {
 
       <AnimatePresence>
         {isChatOpen && (
-          <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="fixed inset-y-0 left-0 w-80 bg-slate-900 z-[60] border-r border-white/10 flex flex-col shadow-2xl shadow-black">
+          <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} className="fixed inset-y-0 left-0 w-80 bg-slate-900/95 z-[60] border-r border-white/10 flex flex-col shadow-2xl">
              <div className="p-6 border-b border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                    <MessageSquare className="w-5 h-5 text-red-500" />
@@ -561,9 +561,9 @@ export default function App() {
 
                 {trickCards.length === 0 && (game.status === 'playing' || game.status === 'bidding') && <div className="text-white/5 font-black text-8xl italic select-none">TABLERO</div>}
                 
-                {view === 'bidding' && isMyTurn && (
-                  <div className="absolute inset-0 z-40 bg-slate-900/60 flex items-center justify-center p-4 rounded-[3.5rem]">
-                     <div className="bg-slate-900 border border-white/20 rounded-[2.5rem] p-8 shadow-2xl w-full max-w-lg">
+                  {view === 'bidding' && isMyTurn && (
+                    <div className="absolute inset-0 z-40 bg-slate-950/80 flex items-center justify-center p-4 rounded-2xl">
+                       <div className="bg-slate-900 border border-white/20 rounded-2xl p-8 shadow-2xl w-full max-w-lg">
                         <h3 className="text-center text-xl font-black mb-6 italic tracking-tighter uppercase">¿CUÁNTAS BAZAS TE LLEVAS?</h3>
                         <div className="flex flex-wrap justify-center gap-2">
                            {(() => {

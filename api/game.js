@@ -186,6 +186,9 @@ async function playCard(supabase, game_id, player_id, card_id) {
     const { data: playedCards } = await supabase.from('cards').select('*').eq('game_id', game_id).eq('is_played', true).is('trick_id', null)
 
     if (playedCards.length === players.length) {
+        // Wait 1.5s so the frontend can show the last card before resolving
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
         const winnerCard = playedCards.reduce((prev, curr) => (curr.value > prev.value ? curr : prev))
         const winnerId = winnerCard.player_id
 
