@@ -100,13 +100,18 @@ async function startRound(supabase, game_id) {
     throw new Error('Game not found or not enough players')
   }
 
+  // DYNAMIC ROUND SCALING: Adjust start round to fit players in the 40-card deck
+  let numCards = game.current_round;
+  if (game.status === 'waiting') {
+    numCards = Math.min(5, Math.floor(40 / players.length));
+  }
+
   const suits = ['oros', 'copas', 'espadas', 'bastos']
   const values = [1, 2, 3, 4, 5, 6, 7, 10, 11, 12]
   let deck = []
   suits.forEach(suit => values.forEach(value => deck.push({ suit, value })))
   deck = deck.sort(() => Math.random() - 0.5)
 
-  const numCards = game.current_round
   let deckIdx = 0
   const dealtCards = []
   for (const player of players) {
@@ -127,6 +132,7 @@ async function startRound(supabase, game_id) {
   const startIndex = Math.floor(Math.random() * players.length)
   await supabase.from('games').update({ 
     status: 'bidding', 
+    current_round: numCards,
     turn_index: startIndex 
   }).eq('id', game_id)
   

@@ -526,7 +526,7 @@ export default function App() {
                       <button key={g.id} onClick={() => joinGame(g.id)} className="w-full flex items-center justify-between p-5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-3xl transition-all group">
                         <div className="text-left">
                            <p className="font-black text-slate-200 line-clamp-1">{g.name || 'Mesa Sin Nombre'}</p>
-                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{g.activeCount || 0} / 4 Jugadores</p>
+                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{g.activeCount || 0} Jugadores</p>
                         </div>
                         <div className="p-3 bg-red-600/10 text-red-500 rounded-2xl group-hover:bg-red-600 group-hover:text-white transition-all"><Plus className="w-4 h-4" /></div>
                       </button>
@@ -547,10 +547,10 @@ export default function App() {
                 <div className="px-5 py-2 bg-red-600 rounded-2xl font-black text-sm">RONDA {game.current_round}</div>
                 <div className="px-5 py-2 bg-black/40 border border-white/10 rounded-2xl font-black text-sm text-slate-400 italic">TURNO: {players[game.turn_index]?.name || '...'}</div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {players.map(p => (
-                  <div key={p.id} className={`p-2 rounded-2xl border transition-all ${players[game.turn_index]?.id === p.id ? 'bg-red-600 border-red-400 scale-110' : 'bg-white/5 border-white/10 shadow-lg'}`}>
-                    <div className="flex flex-col items-center gap-1 relative">
+                  <div key={p.id} className={`p-2 rounded-2xl border transition-all ${players[game.turn_index]?.id === p.id ? 'bg-red-600 border-red-400 scale-110' : 'bg-white/5 border-white/10 shadow-lg'} ${players.length > 5 ? 'scale-90 mx-[-4px]' : ''}`}>
+                    <div className="flex flex-col items-center gap-1 relative min-w-[50px]">
                        <span className="text-[10px] font-black uppercase opacity-60">{p.user_id === session.user.id ? 'TÚ' : p.name.substring(0,8)}</span>
                        <div className="flex items-center gap-1 text-xs font-black">
                           <Heart className={`w-3 h-3 ${players[game.turn_index]?.id === p.id ? 'fill-white' : 'fill-red-500'}`} />
@@ -698,7 +698,7 @@ export default function App() {
                            <span className="w-6 h-6 bg-red-600 rounded-lg flex items-center justify-center text-[10px] italic">02</span>
                            Las Rondas
                         </h3>
-                        <p className="text-slate-400 text-sm">Se juegan rondas descendentes: primero con **5 cartas**, luego 4, 3, 2 y finalmente la ronda de **1 carta**.</p>
+                        <p className="text-slate-400 text-sm">Dependiendo de cuántos seáis, empezamos con **5, 4 o menos cartas**. Cada ronda baja: 4, 3, 2 hasta llegar a **1**.</p>
                      </div>
                      <div className="bg-white/5 p-5 rounded-2xl border border-white/5">
                         <h3 className="text-white font-black uppercase flex items-center gap-3 mb-3">
