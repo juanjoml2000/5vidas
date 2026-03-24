@@ -335,18 +335,18 @@ export default function App() {
       <AnimatePresence>
         {showSpeedWarning && (
           <motion.div 
-            initial={{ y: -50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -50, opacity: 0 }}
-            className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-md"
+            initial={{ y: -100, opacity: 0, x: '-50%' }}
+            animate={{ y: 0, opacity: 1, x: '-50%' }}
+            exit={{ y: -100, opacity: 0, x: '-50%' }}
+            className="fixed top-24 left-1/2 z-[100] w-[92%] max-w-md"
           >
-            <div className="bg-amber-500 text-black px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border-2 border-amber-400">
-               <Zap className="w-8 h-8 fill-current shrink-0" />
-               <div className="text-xs font-black uppercase leading-tight">
-                  <p>¡Atención Jugador!</p>
-                  <p className="opacity-80 font-bold">El juego tiene un pequeño delay de red. Juega con calma para evitar errores.</p>
+            <div className="bg-amber-500 text-black p-4 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-white/20">
+               <Zap className="w-6 h-6 fill-current shrink-0" />
+               <div className="flex-1">
+                  <p className="text-[10px] font-black uppercase tracking-tighter opacity-70">Aviso Speed Control</p>
+                  <p className="text-xs font-black uppercase leading-tight">Juega con calma. El juego tiene delay de red y se puede bugear.</p>
                </div>
-               <button onClick={() => setShowSpeedWarning(false)} className="ml-auto p-1 bg-black/10 rounded-lg"><X className="w-4 h-4" /></button>
+               <button onClick={() => setShowSpeedWarning(false)} className="p-2 bg-black/10 rounded-xl hover:bg-black/20"><X className="w-4 h-4" /></button>
             </div>
           </motion.div>
         )}
