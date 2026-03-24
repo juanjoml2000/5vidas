@@ -77,8 +77,14 @@ export default function Auth() {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) setError(error.message);
     else {
-        setMessage('¡Contraseña actualizada! Ya puedes jugar.');
-        setTimeout(() => setIsUpdatePassword(false), 2000);
+        setMessage('¡Contraseña actualizada! Entrando al juego...');
+        // Force session refresh so user is logged in immediately
+        window.location.hash = '';
+        await supabase.auth.refreshSession();
+        setTimeout(() => {
+          setIsUpdatePassword(false);
+          window.location.reload();
+        }, 1500);
     }
     setLoading(false);
   };

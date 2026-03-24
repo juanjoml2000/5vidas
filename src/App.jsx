@@ -537,7 +537,7 @@ export default function App() {
                 <AnimatePresence>
                   {trickCards.map(t => (
                     <motion.div key={t.id} initial={{ scale: 0, y: 50 }} animate={{ scale: 1, y: 0 }} className="relative">
-                       <Card card={t} disabled isFaceDown={game.current_round === 1} />
+                       <Card card={t} disabled />
                        <div className="absolute -top-3 -right-3 bg-red-600 px-3 py-1 rounded-xl text-[10px] font-black shadow-xl uppercase">{t.player?.name}</div>
                     </motion.div>
                   ))}
