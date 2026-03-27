@@ -100,9 +100,10 @@ async function startRound(supabase, game_id) {
     throw new Error('Game not found or not enough players')
   }
 
-  // DYNAMIC ROUND SCALING: Adjust start round to fit players in the 40-card deck
+  // DYNAMIC ROUND SCALING: Only recalculate numCards on the very first start of the game.
+  // Subsequent rounds use the current_round value already set by resolveRound.
   let numCards = game.current_round;
-  if (game.status === 'waiting') {
+  if (!game.current_round || game.current_round === 0) {
     numCards = Math.min(5, Math.floor(40 / players.length));
   }
 
